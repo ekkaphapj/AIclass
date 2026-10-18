@@ -7,14 +7,16 @@
   "playwright": {
     "tests": 7,
     "passed": 7,
-    "lastRunSeconds": 20.3,
+    "lastRunSeconds": 25.5,
     "browser": "Chromium",
     "mobileViewport": "390x844",
     "desktopViewport": "1440x1000",
     "coverage": [
-      "self-selected four-digit PIN including leading zeros",
+      "group registration (1-5) with unique system-assigned four-digit numbers",
+      "number-only login, logout invalidation, closed retired PIN endpoints",
       "eight exercise pages, previous/next and editable drafts",
       "returning login resumes the last exercise page from the server on a fresh device",
+      "student home view with progress, score and start/continue/redo entry",
       "external AI copy/paste submissions",
       "OCR document and object image downloads",
       "five separate analysis answers",
@@ -22,7 +24,7 @@
       "optional music skipped with 7/7 required completion",
       "final AI review: requires all required lessons, per-exercise 0-10 scores, average, work-link reachability labels, idempotent replay",
       "auto entry to the final summary page after completing the seventh required exercise and on re-login",
-      "instructor review, eight monitor columns and private projection",
+      "instructor group dropdown filtering, per-exercise correct/incorrect tallies, review, eight monitor columns and private projection",
       "budget, lesson locks, CSRF, session and ownership checks"
     ]
   },
@@ -44,7 +46,7 @@
     "url": "https://ai-class-p4.ekapap-j.workers.dev",
     "checks": [
       "fixed-instructor-password",
-      "four-digit-class-code-and-self-pin",
+      "group-registration-assigned-four-digit-number",
       "single-page-external-answer",
       "ocr-and-object-image-assets",
       "live-context-chat-and-five-answers",
@@ -67,5 +69,5 @@
   "optionalExercises": [
     7
   ],
-  "deploymentVersion": "9f8921f0-01e7-4af5-9cd4-844951abcc7b"
+  "deploymentVersion": "97cc965e-08aa-49dd-bdea-8276145d727b"
 }
