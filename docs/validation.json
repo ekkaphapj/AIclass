@@ -7,12 +7,13 @@
   "playwright": {
     "tests": 7,
     "passed": 7,
-    "lastRunSeconds": 25.5,
+    "lastRunSeconds": 21.3,
     "browser": "Chromium",
     "mobileViewport": "390x844",
     "desktopViewport": "1440x1000",
     "coverage": [
-      "group registration (1-5) with unique system-assigned four-digit numbers",
+      "self-entered unique student IDs (1-6 digits): missing 400, duplicate 409, wrong 403",
+      "group selection 1-5 at registration with on-screen ID confirmation",
       "number-only login, logout invalidation, closed retired PIN endpoints",
       "eight exercise pages, previous/next and editable drafts",
       "returning login resumes the last exercise page from the server on a fresh device",
@@ -46,7 +47,7 @@
     "url": "https://ai-class-p4.ekapap-j.workers.dev",
     "checks": [
       "fixed-instructor-password",
-      "group-registration-assigned-four-digit-number",
+      "student-entered-unique-student-number",
       "single-page-external-answer",
       "ocr-and-object-image-assets",
       "live-context-chat-and-five-answers",
@@ -69,5 +70,5 @@
   "optionalExercises": [
     7
   ],
-  "deploymentVersion": "97cc965e-08aa-49dd-bdea-8276145d727b"
+  "deploymentVersion": "0bb826d2-313f-4f09-a057-4be8fcfefa20"
 }
