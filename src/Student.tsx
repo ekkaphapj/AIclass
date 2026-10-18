@@ -448,6 +448,7 @@ function Exercise({
     fieldsRef = useRef(fields),
     timer = useRef<ReturnType<typeof setTimeout> | null>(null),
     advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
+    alive = useRef(true),
     saveSequence = useRef<Promise<unknown>>(Promise.resolve());
   fieldsRef.current = fields;
   const previous = me.submissions.find((s) => s.lesson === l.id),
@@ -520,12 +521,13 @@ function Exercise({
       setCopyState("คัดลอกไม่ได้ ลองแตะค้างที่ข้อความเพื่อคัดลอก");
     }
   }
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
-    },
-    [],
-  );
+    };
+  }, []);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const wasComplete = requiredLessons.every((r) =>
@@ -562,7 +564,7 @@ function Exercise({
       );
       await refresh();
       if (completesAll) onCompletedAll?.();
-      else if (advancing)
+      else if (advancing && alive.current)
         advanceTimer.current = setTimeout(() => {
           advanceTimer.current = null;
           onNavigate(l.id + 1);
