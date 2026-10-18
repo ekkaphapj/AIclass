@@ -64,6 +64,26 @@ export type Submission = {
   answers_json?: string;
 };
 export type QuizResult = { kind: string; score: number; answers?: string };
+export type FinalReviewLesson = {
+  lesson: number;
+  score: number;
+  comment: string;
+  linkStatus?: string;
+};
+export type FinalReviewResult = {
+  lessons: FinalReviewLesson[];
+  average: number;
+  summary: string;
+  checkedAt: number;
+  replayed?: boolean;
+  cost?: number;
+  model?: string;
+};
+export type FinalReview = {
+  status: string;
+  result: string;
+  created_at: number;
+};
 export type Me = {
   role: "student" | "admin";
   student: Person;
@@ -71,6 +91,7 @@ export type Me = {
   drafts: { lesson: number; body: string; updated_at: number }[];
   quizzes: QuizResult[];
   aiUsed: number;
+  finalReview: FinalReview | null;
 };
 export type Settings = Config & {
   id: number;

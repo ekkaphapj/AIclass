@@ -51,7 +51,7 @@ The app is one Worker with static assets, not Pages, not a separate Node server.
 ### Frontend state and saves
 
 - `App` in `src/main.tsx` loads `/api/config` and `/api/me`, then selects login, student or instructor UI by session role. Students and teachers share the browser cookie name, so use separate browser contexts/profiles for end-to-end tests.
-- `src/Student.tsx` keeps active page under `p4-page-<student-id>` and current-course drafts under `p4-v2-<student-id>-<lesson-id>` in localStorage. On entry, `initialFields` chooses newer server/local drafts over an older submission.
+- `src/Student.tsx` keeps active page under `p4-page-<student-id>` and current-course drafts under `p4-v2-<student-id>-<lesson-id>` in localStorage. On login the page restores from localStorage first, then the server-tracked `current_lesson`, so a student returning on another device still lands on the page they left (clamped to the teacher's active lesson when sequential locking is on). Students with all seven required submissions open on the final summary view instead. On entry, `initialFields` chooses newer server/local drafts over an older submission.
 - Changes save locally immediately, debounce server saves by 700 ms and serialize them through a promise chain. Navigation flushes drafts; final submission waits for earlier saves and clears the local draft. Preserve these ordering properties when refactoring.
 - Explicit submission is required. A saved draft is not teacher-visible submitted work. Sending chat messages is not submitting answers.
 - Student presence/profile updates run roughly every 30 seconds; config updates roughly every 20. Teacher monitor polls every 10. “Online” is activity within 90 seconds, not formal attendance verification.
@@ -69,6 +69,7 @@ All handlers are in `worker/index.ts`. JSON errors have `{error}` plus HTTP stat
 | Student | `POST /api/pin`, `/api/heartbeat`, `/api/help` | Self-selected four-digit PIN, presence and help |
 | Student | `POST /api/draft`, `/api/submission`, `/api/quiz` | Drafts, explicit final work and pre/post quizzes |
 | Student | `GET /api/chat`, `POST /api/ai` | Private analysis history and AI calls |
+| Student | `POST /api/final-review` | End-of-class AI grading of every submitted exercise with link reachability checks; requires all seven required lessons |
 | Owner/teacher | `GET /api/image/:submissionId` | Private legacy uploaded image |
 | Teacher | `GET /api/admin/overview`, `/api/admin/student/:id`, `/api/admin/export` | Monitor, detailed submissions, CSV |
 | Teacher | `POST /api/admin/settings`, `/api/admin/review`, `/api/admin/clear-help`, `/api/admin/recovery` | Class controls, review, help resolution, numeric PIN reset |
@@ -87,8 +88,9 @@ Apply migrations in order; do not edit previously applied files.
 | `submissions` | Unique `(student_id,lesson)`; prompt/result/reflection/tool/link, media/status/score/feedback; `answers_json` added in migration 0002 |
 | `drafts` | Per student/lesson JSON text and update time |
 | `quizzes` | Per student + pre/post kind; first submitted score is retained |
-| `ai_jobs` | Idempotency ID, owner, status, reserved and actual cost, cached result |
+| `ai_jobs` | Idempotency ID, owner, status, reserved and actual cost, cached result. `lesson=0` rows are end-of-class final reviews; `lesson<>0` counts feed the 18-per-student chat quota |
 | `chat_messages` | Per-student analysis history; added by migration 0002 |
+| `final_reviews` | One row per student with the latest AI final-review status/result; added by migration 0003 |
 | `attachments` | Legacy private image data URLs; authorization required when reading |
 | `login_attempts` | Throttle counters; 10-minute windows |
 
@@ -99,7 +101,8 @@ Final work is upserted. Re-submission resets status to `submitted`, clears score
 Secrets: `OPENROUTER_API_KEY`, `ADMIN_PASSWORD`, `CLASS_CODE`. Runtime model/price estimates: `AI_MODEL`, `AI_INPUT_PRICE`, `AI_OUTPUT_PRICE` in Wrangler config. The existing model is `z-ai/glm-5.3-flash`; verify live availability/pricing before replacing it.
 
 - Admission is an atomic `INSERT ... SELECT` conditioned on per-person/global concurrency, quotas and reserved cost. Do not split the checks into a read-then-write race.
-- Per student: 18 successful/running calls; one active call. Global concurrency: 12. Defaults: US$3 cumulative and 1,800 successful/running calls.
+- Per student: 18 successful/running chat calls (jobs with `lesson<>0`); one active chat call. Global concurrency: 12 across everything. Defaults: US$3 cumulative and 1,800 successful/running calls.
+- `POST /api/final-review` requires every required lesson submitted, then admits a `lesson=0` job (separate 5-per-student allowance, shared global caps/budget). It fetches each submitted HTTPS work link once (8-second timeout) for a reachability label, sends one grading call with per-exercise answers plus the lesson 6 reference counts, and stores strict-JSON scores (0–10 per exercise, averaged over the seven required), summary and link labels in `final_reviews` and the job's cached result. Duplicate job IDs replay the stored review. Edited submissions after a review leave the stored review in place; the student UI flags it stale and re-running spends another of the five runs. Instructor manual scores remain the official review.
 - Reserve US$0.004 before calling. Success replaces it with reported usage cost, or configured token-price estimate. Failed/uncertain calls retain a conservative reservation as cost. Running records older than 90 seconds are reclaimed as failed with reserved cost.
 - Maximum output: 2,400 tokens including reasoning; provider timeout: 55 seconds. Model rejects reasoning disabled, so keep `reasoning: {effort:'low',exclude:true}` unless a tested model change requires otherwise.
 - For lesson 6, the Worker injects the source dataset and five questions, then up to three preceding turns with truncated lengths. It does not trust client-supplied dataset content as the authoritative source.
@@ -149,7 +152,7 @@ For rollback, inspect the actual current deployment history with Wrangler and it
 
 - Single classroom, no class/tenant ID; no reusable-cohort archive/reset flow yet.
 - No automatic retention/deletion policy; no official identity/attendance verification.
-- No weighted course grade, certificate generation or AI grading pipeline; reviews are manual.
+- No weighted course grade or certificate generation. The end-of-class AI review gives advisory per-exercise scores; instructor reviews and 0–10 scores remain manual and official.
 - No durable work queue, live WebSocket presence, model fallback, offline service worker, or resumable file-upload flow.
 - The instructor file is still large; changing shared UI/layout requires checking both screens. Some teacher reference prose and numeric course labels are intentionally explicit and can drift if the dataset changes.
 - Four-digit PINs are an owner choice. Keep session authorization and throttling; do not silently change the requested login flow or expose PINs in monitor/export.

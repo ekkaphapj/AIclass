@@ -6,8 +6,10 @@ Read this file, `README.md`, and `docs/AGENT_HANDOFF.md` before changing the app
 
 - Thai mobile student UI, police khaki/brown/gold theme, **AI POLICE LAB · By: Dr.Ake** branding.
 - Exactly eight numbered exercises, one per page. Previous/next, clickable steps, persistent drafts, and editable submissions must work.
+- Returning students resume their last exercise page (localStorage first, then the server-tracked current lesson) with drafts and submitted answers intact.
 - Exercise 7 (music) is optional. Completion means all **seven required** exercises, not eight submissions.
 - Exercises 1–5 use external AI and pasted text. Exercises 4/5 provide downloadable training images. Exercise 6 has five answer fields and an OpenRouter chat using the server's 18-row dataset. Exercises 7/8 accept HTTPS work links.
+- Once all seven required exercises are submitted, the student enters the final summary page. Its submit button runs one OpenRouter grading call giving per-exercise 0–10 scores, an average, and a reachability check of the exercise 7/8 work links. Results persist per student (max 5 runs each); instructor manual scores remain the official review.
 - Students choose a four-digit numeric PIN; preserve leading zeroes. Login uses roster number + PIN. Production instructor/class credentials are secrets, never client constants.
 - Instructor dashboard, eight task columns, per-student review, projection with names initially hidden, QR entry, and CSV export must remain usable on a computer.
 
@@ -73,4 +75,4 @@ For an authorized release, typecheck/build, apply any new remote migrations, the
 
 ## Known limitations
 
-Single classroom, manual per-exercise scores, no automatic retention/reset, no durable AI job queue. The 150-user load result is historical local testing of course v1 without AI calls; it is not proof of current production capacity. See `docs/validation.json` and the handoff for evidence and remaining limits.
+Single classroom, no automatic retention/reset, no durable AI job queue. Per-exercise instructor scores stay manual; the end-of-class AI review is preliminary and advisory. The 150-user load result is historical local testing of course v1 without AI calls; it is not proof of current production capacity. See `docs/validation.json` and the handoff for evidence and remaining limits.

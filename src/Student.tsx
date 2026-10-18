@@ -18,8 +18,16 @@ import {
   ChevronDown,
   BookOpen,
   MessageSquare,
+  Award,
 } from "lucide-react";
-import { api, ApiError, type Config, type Me, type Submission } from "./api";
+import {
+  api,
+  ApiError,
+  type Config,
+  type FinalReviewResult,
+  type Me,
+  type Submission,
+} from "./api";
 import {
   lessons,
   requiredLessons,
@@ -127,24 +135,52 @@ export default function StudentApp({
   refresh: () => Promise<void>;
   onLogout: () => void;
 }) {
+  const allRequiredDone = requiredLessons.every((l) =>
+    me.submissions.some((s) => s.lesson === l.id),
+  );
   const [active, setActive] = useState(() => {
-      try {
-        const stored = Number(localStorage.getItem(`p4-page-${me.student.id}`));
-        if (stored >= 1 && stored <= 8) return stored;
-      } catch {}
-      return (
-        requiredLessons.find(
-          (l) => !me.submissions.some((s) => s.lesson === l.id),
-        )?.id || 1
-      );
-    }),
-    [view, setView] = useState<"exercise" | "quiz">("exercise"),
+    try {
+      const stored = Number(localStorage.getItem(`p4-page-${me.student.id}`));
+      if (stored >= 1 && stored <= lessons.length) return stored;
+    } catch {}
+    const server = Number(me.student.current_lesson);
+    if (server >= 1 && server <= lessons.length) return server;
+    return (
+      requiredLessons.find(
+        (l) => !me.submissions.some((s) => s.lesson === l.id),
+      )?.id || 1
+    );
+  }),
+    [view, setView] = useState<"exercise" | "quiz" | "final">(
+      allRequiredDone ? "final" : "exercise",
+    ),
     [modal, setModal] = useState<"help" | "pin" | null>(null),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const completed = requiredLessons.filter((l) =>
     me.submissions.some((s) => s.lesson === l.id),
   ).length;
+  const finalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelFinalSwitch = useCallback(() => {
+    if (finalTimer.current) {
+      clearTimeout(finalTimer.current);
+      finalTimer.current = null;
+    }
+  }, []);
+  const scheduleFinalSwitch = useCallback(() => {
+    cancelFinalSwitch();
+    setNotice("ตอบครบทุกข้อหลักแล้ว — เดี๋ยวพาไปหน้าส่งคำตอบทั้งหมด");
+    finalTimer.current = setTimeout(() => {
+      finalTimer.current = null;
+      setView("final");
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }, 1600);
+  }, [cancelFinalSwitch]);
+  useEffect(() => cancelFinalSwitch, [cancelFinalSwitch]);
+  useEffect(() => {
+    if (config.lock_following && active > config.active_lesson)
+      setActive(Math.max(1, config.active_lesson));
+  }, [config.lock_following, config.active_lesson, active]);
   useEffect(() => {
     const beat = () => {
       if (!document.hidden) {
@@ -157,6 +193,7 @@ export default function StudentApp({
     return () => clearInterval(interval);
   }, [active, refresh]);
   const navigate = (n: number) => {
+    cancelFinalSwitch();
     if (config.lock_following && n > config.active_lesson) {
       setNotice("รอผู้สอนเปิดข้อนี้ก่อนนะครับ");
       return;
@@ -234,12 +271,34 @@ export default function StudentApp({
               );
             })}
           </div>
+          {allRequiredDone && view !== "final" && (
+            <button
+              className="final-cta"
+              onClick={() => {
+                cancelFinalSwitch();
+                setView("final");
+                window.scrollTo({ top: 0, behavior: "instant" });
+              }}
+            >
+              <Award size={18} />
+              ตอบครบทุกข้อหลักแล้ว — ส่งคำตอบทั้งหมดและดูคะแนนรวม
+            </button>
+          )}
         </section>
         {view === "quiz" ? (
           <StudentQuiz
             me={me}
             refresh={refresh}
             onBack={() => setView("exercise")}
+          />
+        ) : view === "final" ? (
+          <FinalReview
+            me={me}
+            refresh={refresh}
+            onBack={() => {
+              setView("exercise");
+              window.scrollTo({ top: 0, behavior: "instant" });
+            }}
           />
         ) : (
           <Exercise
@@ -249,6 +308,7 @@ export default function StudentApp({
             config={config}
             refresh={refresh}
             onNavigate={navigate}
+            onCompletedAll={scheduleFinalSwitch}
           />
         )}
         <footer className="student-simple-footer">
@@ -256,6 +316,7 @@ export default function StudentApp({
           <div>
             <button
               onClick={() => {
+                cancelFinalSwitch();
                 setView("quiz");
                 window.scrollTo(0, 0);
               }}
@@ -361,12 +422,14 @@ function Exercise({
   config,
   refresh,
   onNavigate,
+  onCompletedAll,
 }: {
   lesson: Lesson;
   me: Me;
   config: Config;
   refresh: () => Promise<void>;
   onNavigate: (n: number) => void;
+  onCompletedAll?: () => void;
 }) {
   const [fields, setFields] = useState<Fields>(() => initialFields(me, l.id)),
     [busy, setBusy] = useState(false),
@@ -451,6 +514,9 @@ function Exercise({
   }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const wasComplete = requiredLessons.every((r) =>
+      me.submissions.some((s) => s.lesson === r.id),
+    );
     setBusy(true);
     setError("");
     if (timer.current) clearTimeout(timer.current);
@@ -467,6 +533,13 @@ function Exercise({
       setDraftState("");
       setSuccess("ส่งคำตอบแล้ว กลับมาแก้ไขและส่งใหม่ได้");
       await refresh();
+      if (
+        !wasComplete &&
+        requiredLessons.every(
+          (r) => r.id === l.id || me.submissions.some((s) => s.lesson === r.id),
+        )
+      )
+        onCompletedAll?.();
     } catch (e) {
       setError(message(e));
     } finally {
@@ -962,6 +1035,178 @@ function AnalysisChat({ paused, used }: { paused: boolean; used: number }) {
         ใช้ GLM 5.3 Flash ผ่าน OpenRouter · อ่านและตรวจตัวเลขก่อนนำคำตอบไปส่ง
       </small>
     </section>
+  );
+}
+function FinalReview({
+  me,
+  refresh,
+  onBack,
+}: {
+  me: Me;
+  refresh: () => Promise<void>;
+  onBack: () => void;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [status, setStatus] = useState(""),
+    [justDone, setJustDone] = useState(false);
+  const saved = me.finalReview;
+  let result: FinalReviewResult | null = null;
+  try {
+    result =
+      saved && saved.status === "done" ? JSON.parse(saved.result) : null;
+  } catch {}
+  const stale = !!(
+    result &&
+    me.submissions.some((s) => s.updated_at > (saved?.created_at || 0))
+  );
+  async function run() {
+    setBusy(true);
+    setError("");
+    setJustDone(false);
+    const id = crypto.randomUUID();
+    setStatus("กำลังรวบรวมคำตอบและตรวจสอบลิงก์…");
+    try {
+      for (let i = 0; i < 25; i++) {
+        try {
+          await api<FinalReviewResult>("/final-review", { id });
+          setJustDone(true);
+          await refresh();
+          return;
+        } catch (e) {
+          if (e instanceof ApiError && e.retry && i < 24) {
+            setStatus(
+              i === 0
+                ? "กำลังให้ AI ตรวจงานทุกข้อ ใช้เวลาสักครู่…"
+                : "มีผู้ใช้งาน AI พร้อมกัน กำลังรอคิว…",
+            );
+            await new Promise((r) => setTimeout(r, 4000));
+            continue;
+          }
+          throw e;
+        }
+      }
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+      setStatus("");
+    }
+  }
+  const checkedAt = result?.checkedAt
+    ? new Date(result.checkedAt).toLocaleString("th-TH", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "";
+  return (
+    <article className="exercise-page final-page">
+      <div className="exercise-heading">
+        <div className="exercise-number final">
+          <Award size={26} />
+        </div>
+        <div>
+          <div className="exercise-kicker">
+            ตอบครบทั้ง {requiredLessons.length} ข้อหลักแล้ว
+          </div>
+          <h1>สรุปและส่งคำตอบทั้งหมด</h1>
+        </div>
+      </div>
+      <p className="exercise-intro">
+        ตรวจรายการคำตอบด้านล่างให้เรียบร้อย แล้วกดปุ่มให้ AI ช่วยตรวจเบื้องต้น
+        พร้อมขึ้นคะแนนทันทีทุกข้อ ลิงก์เพลงและภาพจะถูกตรวจด้วยว่าเปิดได้จริง
+      </p>
+      <section className="final-list">
+        {lessons.map((lesson) => {
+          const sub = me.submissions.find((s) => s.lesson === lesson.id),
+            graded = result?.lessons.find((g) => g.lesson === lesson.id);
+          return (
+            <div className={`final-row ${sub ? "sent" : ""}`} key={lesson.id}>
+              <span className="final-row-number">
+                {sub ? <Check size={16} /> : lesson.id}
+              </span>
+              <div>
+                <b>{lesson.title}</b>
+                <small>
+                  {sub
+                    ? `ส่งแล้ว · ${sub.tool}`
+                    : lesson.optional
+                      ? "ไม่ได้ส่ง — ข้อนี้ไม่บังคับ"
+                      : "ยังไม่ส่ง"}
+                </small>
+                {sub && (
+                  <p>
+                    {sub.link
+                      ? sub.link
+                      : sub.result.slice(0, 180) +
+                        (sub.result.length > 180 ? "…" : "")}
+                  </p>
+                )}
+                {graded && (
+                  <div className="final-grade">
+                    <span
+                      className={`score-chip ${graded.score >= 7 ? "good" : graded.score >= 4 ? "ok" : "low"}`}
+                    >
+                      {graded.score}/10
+                    </span>
+                    <span>{graded.comment}</span>
+                    {graded.linkStatus && (
+                      <small>ผลตรวจลิงก์: {graded.linkStatus}</small>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </section>
+      {result && (
+        <section className="final-result">
+          <div className="final-average">
+            <Award size={30} />
+            <div>
+              <span>คะแนนเฉลี่ย {requiredLessons.length} ข้อหลักจาก AI</span>
+              <strong>{result.average}/10</strong>
+            </div>
+          </div>
+          {result.summary && <p>{result.summary}</p>}
+          {checkedAt && <small>ตรวจเมื่อ {checkedAt}</small>}
+          {stale && (
+            <p className="final-stale">
+              มีการแก้ไขคำตอบหลังตรวจล่าสุด กดตรวจใหม่เพื่ออัปเดตคะแนน
+            </p>
+          )}
+        </section>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {justDone && !error && (
+        <p className="form-success" role="status">
+          <CheckCircle2 size={18} /> ตรวจเรียบร้อย — ดูคะแนนด้านบนได้เลย
+        </p>
+      )}
+      {busy && status && (
+        <p className="chat-wait final-wait" role="status">
+          <Loader2 size={19} className="spin" /> {status}
+        </p>
+      )}
+      <div className="answer-submit final-submit">
+        <small>
+          ผลตรวจของ AI เป็นเบื้องต้นเพื่อช่วยการเรียนรู้ คะแนนที่แท้จริงมาจากผู้สอน
+          · ตรวจได้สูงสุด 5 ครั้ง
+        </small>
+        <Btn type="button" busy={busy} onClick={() => void run()}>
+          <Award size={18} />
+          {result ? "ให้ AI ตรวจใหม่" : "ส่งคำตอบทั้งหมดและให้ AI ตรวจคะแนน"}
+        </Btn>
+      </div>
+      <button className="text-btn final-back" onClick={onBack}>
+        <ArrowLeft size={18} /> กลับไปแก้ไขคำตอบ
+      </button>
+    </article>
   );
 }
 function StudentQuiz({

@@ -1,0 +1,1 @@
+CREATE TABLE final_reviews(student_id TEXT PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE, status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', job_id TEXT NOT NULL, created_at INTEGER NOT NULL, finished_at INTEGER);

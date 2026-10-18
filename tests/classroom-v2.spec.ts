@@ -157,6 +157,27 @@ test("self-selected numeric PIN, ownership, individual answers and optional work
   ).toBe(403);
 });
 
+test("mobile: returning login resumes the last exercise page from the server", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+  });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await page.getByRole("button", { name: "กลับเข้าเรียน", exact: true }).click();
+  await page.locator('input[name="number"]').fill(number);
+  await page.locator('input[name="recovery"]').fill("0456");
+  await page
+    .getByRole("button", { name: "กลับเข้าสู่ห้องเรียน", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "ทำภาพสรุปงานสายตรวจ", exact: true }),
+  ).toBeVisible();
+  await ctx.close();
+});
+
 test("real analysis chat uses server dataset, retains history, does not duplicate calls", async () => {
   const id = randomUUID();
   const r = await student.post("/api/ai", {
@@ -193,6 +214,71 @@ test("real analysis chat uses server dataset, retains history, does not duplicat
         cost: result.cost,
         characters: result.result.length,
         history: history.length,
+      },
+      null,
+      2,
+    ),
+  );
+});
+
+test("final AI review requires every required lesson, grades with scores and link checks, replays", async () => {
+  test.setTimeout(180000);
+  expect(
+    (await student.post("/api/final-review", { data: { id: randomUUID() } }))
+      .status(),
+  ).toBe(400);
+  for (const lesson of [2, 3, 4, 5]) {
+    expect(
+      (
+        await student.post("/api/submission", {
+          data: {
+            lesson,
+            result: `คำตอบข้อ ${lesson} จากการฝึกด้วยข้อมูลสมมติเพื่อการเรียน`,
+            tool: "Gemini",
+          },
+        })
+      ).ok(),
+    ).toBeTruthy();
+  }
+  const id = randomUUID();
+  const r = await student.post("/api/final-review", {
+    data: { id },
+    timeout: 95000,
+  });
+  const result = await r.json();
+  expect(r.ok(), JSON.stringify(result)).toBeTruthy();
+  const rows = result.lessons as {
+    lesson: number;
+    score: number;
+    linkStatus?: string;
+  }[];
+  for (const rid of [1, 2, 3, 4, 5, 6, 8])
+    expect(
+      rows.some((x) => x.lesson === rid && x.score >= 0 && x.score <= 10),
+      `lesson ${rid} graded`,
+    ).toBe(true);
+  expect(result.average).toBeGreaterThanOrEqual(0);
+  expect(result.average).toBeLessThanOrEqual(10);
+  expect(String(result.summary).length).toBeGreaterThan(0);
+  expect(rows.find((x) => x.lesson === 8)?.linkStatus || "").not.toBe("");
+  const meAfter = await (await student.get("/api/me")).json();
+  expect(meAfter.finalReview.status).toBe("done");
+  const replay = await (
+    await student.post("/api/final-review", { data: { id }, timeout: 30000 })
+  ).json();
+  expect(replay.replayed).toBe(true);
+  expect(replay.average).toBe(result.average);
+  writeFileSync(
+    "test-results/final-review-smoke.json",
+    JSON.stringify(
+      {
+        average: result.average,
+        lessons: rows.map((x) => ({
+          lesson: x.lesson,
+          score: x.score,
+          linkStatus: x.linkStatus || null,
+        })),
+        summary: result.summary,
       },
       null,
       2,
@@ -355,6 +441,29 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  const ctx2 = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+  });
+  const page2 = await ctx2.newPage();
+  await page2.goto("/");
+  await page2
+    .getByRole("button", { name: "กลับเข้าเรียน", exact: true })
+    .click();
+  await page2.locator('input[name="number"]').fill(uiNumber);
+  await page2.locator('input[name="recovery"]').fill("0789");
+  await page2
+    .getByRole("button", { name: "กลับเข้าสู่ห้องเรียน", exact: true })
+    .click();
+  await expect(
+    page2.getByRole("heading", { name: "สรุปและส่งคำตอบทั้งหมด", exact: true }),
+  ).toBeVisible();
+  await expect(page2.locator(".final-row").nth(6)).toContainText("ไม่ได้ส่ง");
+  await page2.screenshot({
+    path: "test-results/v2-student-final-review.png",
+    fullPage: true,
+  });
+  await ctx2.close();
   expect(errors).toEqual([]);
   await ctx.close();
 });
