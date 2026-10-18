@@ -169,5 +169,49 @@
       "newJavascriptAsset": 200,
       "anonymousExtensions": 401
     }
+  },
+  "extensionAiAndLessonRevision": {
+    "date": "2026-10-19",
+    "version": "e1d2098f-21fd-4ffb-ad43-651ca63ce2ff",
+    "typecheck": "passed",
+    "build": "passed with existing lucide-react directive warnings",
+    "migration": "none; extension chat uses existing history/jobs tables with lesson 9/10",
+    "backend": {
+      "command": "npm run test:extension-ai",
+      "passed": 4,
+      "provider": "mocked; actual Worker bundle and in-memory SQLite with migration SQL",
+      "coverage": [
+        "extension unlock and mission validation",
+        "authoritative case context",
+        "private per-mission history",
+        "idempotency and cross-scope replay rejection",
+        "shared pause/budget/concurrency/quota",
+        "retained reservation on provider failure",
+        "text-diagram submission without link"
+      ]
+    },
+    "browser": {
+      "passed": 4,
+      "seconds": 7.0,
+      "command": "npx playwright test tests/extensions.spec.ts tests/revised-lessons.spec.ts tests/classroom-v2.spec.ts --grep \"extension gating|self-entered|returning login|mobile Chinese\"",
+      "coverage": [
+        "original registration and returning-login regression",
+        "both extension chat interfaces with mocked provider replies",
+        "copying answers does not submit work",
+        "prompt/draft persistence and instructor review",
+        "360/390px mobile width",
+        "Chinese source plus follow-up research task",
+        "new object image render/download and answer submission",
+        "PNG diagram template export"
+      ],
+      "limits": "No live OpenRouter/Gemini regression or physical-device run; no live legal source verification by assistant (exercise asks learner to research/verify official links)."
+    },
+    "productionReadOnly": {
+      "health": 200,
+      "instructorPage": 200,
+      "objectImageHEAD": 200,
+      "anonymousExtensionChat": 401
+    },
+    "imageProvenance": "built-in imagegen; local project asset reviewed; see docs/training-assets.md"
   }
 }

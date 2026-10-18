@@ -1,3 +1,4 @@
+import { ExtensionAi } from "./ExtensionAi";
 import React, { useEffect, useState, useRef } from "react";
 import { api } from "./api";
 import {
@@ -148,7 +149,7 @@ export function Extensions({ studentId }: { studentId: string }) {
     c.fillStyle = "#463923";
     c.font = "bold 32px sans-serif";
     c.fillText(
-      active === 1 ? "คดีจำลอง — Timeline" : "แผนชุมชนจำลอง 7 วัน",
+      active === 1 ? "คดีจำลอง — Diagram ความเชื่อมโยง" : "แผนชุมชนจำลอง 7 วัน",
       40,
       65,
     );
@@ -194,38 +195,71 @@ export function Extensions({ studentId }: { studentId: string }) {
       lines("นาฬิกา 24 ชั่วโมง / ใช้ข้อค้นพบด้านล่างระบุจำนวนเหตุ");
     }
     if (active === 1) {
-      const events = findings
-        .split("\n")
-        .filter((x) => x.trim())
-        .slice(0, 6);
-      c.strokeStyle = "#927c51";
-      c.lineWidth = 5;
-      c.beginPath();
-      c.moveTo(55, 120);
-      c.lineTo(55, 120 + Math.max(0, events.length - 1) * 160);
-      c.stroke();
-      events.forEach((event, i) => {
-        const top = 120 + i * 160;
-        c.fillStyle = "#72592f";
-        c.beginPath();
-        c.arc(55, top, 12, 0, Math.PI * 2);
-        c.fill();
+      const box = (x: number, y: number, title: string, detail: string) => {
+        c.fillStyle = "#fffdf7";
+        c.fillRect(x, y, 300, 95);
+        c.strokeStyle = "#927c51";
+        c.lineWidth = 2;
+        c.strokeRect(x, y, 300, 95);
         c.fillStyle = "#463923";
-        let line = "",
-          row = 0;
-        for (const char of event.slice(0, 100)) {
-          if (c.measureText(line + char).width > 720) {
-            c.fillText(line, 90, top + row * 34);
-            line = "";
-            row++;
-          }
-          line += char;
-        }
-        c.fillText(line, 90, top + row * 34);
-      });
-      y = 1150;
-      lines("สมมติฐาน / ข้อจำกัด / ตรวจต่อ");
-      lines(plan.slice(0, 220));
+        c.font = "bold 25px sans-serif";
+        c.fillText(title, x + 15, y + 35);
+        c.font = "20px sans-serif";
+        c.fillText(detail, x + 15, y + 68);
+      };
+      const arrow = (
+        x1: number,
+        y1: number,
+        x2: number,
+        y2: number,
+        label: string,
+        dashed = false,
+      ) => {
+        c.strokeStyle = "#72592f";
+        c.fillStyle = "#463923";
+        c.lineWidth = 3;
+        c.setLineDash(dashed ? [9, 7] : []);
+        c.beginPath();
+        c.moveTo(x1, y1);
+        c.lineTo(x2, y2);
+        c.stroke();
+        c.setLineDash([]);
+        const a = Math.atan2(y2 - y1, x2 - x1);
+        c.beginPath();
+        c.moveTo(x2, y2);
+        c.lineTo(x2 - 14 * Math.cos(a - 0.4), y2 - 14 * Math.sin(a - 0.4));
+        c.moveTo(x2, y2);
+        c.lineTo(x2 - 14 * Math.cos(a + 0.4), y2 - 14 * Math.sin(a + 0.4));
+        c.stroke();
+        c.font = "20px sans-serif";
+        c.fillText(label, Math.min(x1, x2) + 10, Math.min(y1, y2) - 12);
+      };
+      box(40, 140, "นายตรี", "เครื่อง/เบอร์ตามข้อมูลบุคคล");
+      box(560, 140, "ผู้ใช้ยังไม่ยืนยัน", "อย่าระบุตัวคนจากเครื่องลำพัง");
+      box(40, 330, "083-333", "เครื่อง IMEI-CCC");
+      box(560, 330, "095-999", "เครื่อง IMEI-AAA (R4/6/8/9)");
+      arrow(190, 235, 190, 330, "ข้อมูลบุคคล");
+      arrow(710, 235, 710, 330, "ต้องตรวจผู้ใช้จริง", true);
+      arrow(340, 365, 560, 365, "R3 14:15 SMS");
+      arrow(560, 410, 340, 410, "R9 14:50 โทร");
+      box(40, 570, "081-111", "IMEI-DDD • ดอนเมือง R2/7");
+      box(560, 570, "096-666", "ยังไม่ทราบผู้ใช้ / บทบาท");
+      arrow(710, 425, 710, 570, "R4/6/8 ติดต่อซ้ำ");
+      box(40, 800, "นายเอก", "AAA คือเครื่องประจำตามข้อมูล");
+      arrow(190, 800, 190, 665, "เบอร์หลักตามข้อมูล", true);
+      c.fillStyle = "#463923";
+      c.font = "23px sans-serif";
+      c.fillText("095-999: เสาใกล้ธนาคาร → ป่าริมแม่น้ำ", 40, 990);
+      c.fillText(
+        "เส้นประ = ต้องตรวจยืนยัน • เสาทางโทรศัพท์ไม่ใช่ตำแหน่งคน",
+        40,
+        1040,
+      );
+      y = 1110;
+      lines("ข้อค้นพบของผู้เรียน:");
+      lines(findings.slice(0, 140));
+      y += 10;
+      lines(plan.slice(0, 130));
     } else {
       lines(findings.slice(0, 280));
       y += 20;
@@ -389,7 +423,7 @@ export function Extensions({ studentId }: { studentId: string }) {
                 )}
                 {step === 2 && (
                   <div className="extension-stage">
-                    <h4>ให้ AI ช่วย 4 อย่าง</h4>
+                    <h4>ทำแค่ 3 อย่าง</h4>
                     <ol className="extension-task-list">
                       {current.tasks.map((task) => (
                         <li key={task}>{task}</li>
@@ -422,6 +456,12 @@ export function Extensions({ studentId }: { studentId: string }) {
                         onChange={(e) => update("prompt", e.target.value)}
                       />
                     </label>
+                    <ExtensionAi
+                      key={active}
+                      mission={active}
+                      prompt={prompt}
+                    />
+                    <h4>ทางเลือก 2 · ใช้ Gemini</h4>
                     <div className="extension-actions">
                       <button className="btn" onClick={() => void copy(true)}>
                         คัดลอกข้อมูล + prompt
@@ -437,11 +477,15 @@ export function Extensions({ studentId }: { studentId: string }) {
                     </div>
                     <div className="extension-brief">
                       <h4>ทำบนมือถืออย่างไร?</h4>
-                      <p>1. กดคัดลอก → เปิด Gemini → วางแล้วส่ง</p>
+                      <p>
+                        เลือกถาม OpenRouter ในหน้านี้ หรือคัดลอกไป Gemini
+                        อย่างใดอย่างหนึ่งก็ได้
+                      </p>
                       <p>2. อ่านคำตอบ เทียบกับข้อมูล หากคลาดเคลื่อนให้ถามแก้</p>
                       <p>
-                        3. ให้ Gemini ทำภาพ 1 ภาพ
-                        แล้วคัดลอกคำตอบและลิงก์ผลงานกลับมาส่ง
+                        คัดลอกคำตอบไปวางในขั้นส่งงาน หากใช้ Gemini ทำ diagram
+                        เป็นภาพได้ ให้นำลิงก์มาด้วย ถ้าใช้ AI ในระบบ ส่ง diagram
+                        แบบข้อความได้
                       </p>
                     </div>
                     <div className="extension-stepbar">
@@ -458,8 +502,8 @@ export function Extensions({ studentId }: { studentId: string }) {
                   <div className="extension-stage">
                     <h4>ส่งเพียง 3 ช่อง</h4>
                     <p>
-                      Prompt จากขั้นที่ 2 จะถูกส่งไปด้วย เตรียมเล่าหน้าชั้น 60
-                      วินาที
+                      วางคำตอบใน 2 ช่อง ลิงก์ diagram ใส่ถ้ามี Prompt จากขั้นที่
+                      2 จะถูกส่งไปด้วย เตรียมเล่า 60 วินาที
                     </p>
                     <label>
                       {current.findingsLabel}
@@ -484,7 +528,7 @@ export function Extensions({ studentId }: { studentId: string }) {
                       />
                     </label>
                     <label>
-                      ลิงก์ภาพหรือผลงาน Gemini (HTTPS)
+                      ลิงก์ diagram หรือผลงาน Gemini (ถ้ามี, HTTPS)
                       <input
                         type="url"
                         inputMode="url"

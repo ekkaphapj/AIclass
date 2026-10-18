@@ -20,9 +20,9 @@ The main audience is approximately 150 police cadets using phones in a two-hour 
 | --- | --- | --- |
 | 1 | One-line question about police patrol duties, asked in external Gemini/ChatGPT | Pasted answer |
 | 2 | More complex Thai police/legal question with source checking | Pasted answer |
-| 3 | English missing-bag report translated into Thai | Pasted translation |
+| 3 | Chinese tourist report about missing passport/phone; translate and research appropriate next steps | Translation, follow-up questions, assistance plan and verified official links |
 | 4 | Download fictional official-style document image; ask external AI to transcribe | OCR text, not translation |
-| 5 | Download unattended-bag image; ask external AI to describe visible observations | Pasted description; no invented contents |
+| 5 | Download unknown-device image; compare possible device types using visible features | Candidate identifications, supporting features and uncertainty |
 | 6 | Analyze 18 fictional incidents in four subdistricts | Five separate answers, 6.1–6.5 |
 | 7 | Optional upbeat male-vocal luk thung/molam call-center-scam warning song in Gemini | HTTPS work link; skipping does not block completion |
 | 8 | Patrol-workflow infographic generated in Gemini using example prompt | HTTPS work link |
@@ -159,3 +159,13 @@ For rollback, inspect the actual current deployment history with Wrangler and it
 - Law answers, generated infographics and object descriptions are training outputs, not validated legal/procedural decisions. Do not bake an AI's unverified response into an official answer key.
 
 Before handing off another change, summarize what changed, tests actually run, deployment status, and any remaining limitation. Keep credentials and real learner records out of Git and final public artifacts.
+
+## Extension chat and revised content (2026-10-19)
+
+Exercise 3 now requires Chinese translation plus follow-up assistance research with official links (no promise of travel permission). Exercise 5 uses unknown-device.png and asks for candidate device types and evidence, not a general scene caption. See training-assets.md for image provenance.
+
+Both extension missions offer OpenRouter or external Gemini in step 2. /api/ai accepts extension=1/2; server verifies all seven original required submissions before calls/replay and injects its own case dataset. Internally these use ai_jobs/chat_messages lesson=9/10; original lesson validation still accepts only 1–8 and lesson 6 chat is unchanged. All chats share the existing 18 successful/running allowance, atomic reservation, global concurrency, budget, retries and idempotency rules. /api/chat?extension=1 or 2 retrieves only the authenticated learner's matching history and rechecks unlock. Job IDs cannot be replayed across lesson/extension/final-review scopes.
+
+Internal AI is text-only, with no web search or image generation. Learners may submit a text diagram without a work link; supplied links still require HTTPS. Copying an AI answer never submits it automatically. Mission 1 asks for a person–phone–IMEI evidence diagram with times, R labels and uncertain links rather than a reenactment image; mission 2 remains a simple count/map/patrol planning task. No migration needed.
+
+Run npm run test:extension-ai for four mocked-provider tests executing the actual Worker against in-memory SQLite using applied migration SQL. Browser checks are separate; neither is proof of live provider availability. A full suite still needs a real local API key.

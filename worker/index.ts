@@ -38,7 +38,13 @@ type Student = {
   current_lesson: number;
   help: string;
 };
-type Job = { id: string; student_id: string; status: string; result: string };
+type Job = {
+  id: string;
+  student_id: string;
+  lesson: number;
+  status: string;
+  result: string;
+};
 class HttpError extends Error {
   constructor(
     public status: number,
@@ -173,6 +179,24 @@ async function ensureLesson(env: Cloudflare.Env, id: number) {
     throw new HttpError(403, "ผู้สอนยังไม่เปิดภารกิจนี้");
   return c;
 }
+async function requireExtension(
+  env: Cloudflare.Env,
+  id: string,
+  mission: number,
+) {
+  if (![1, 2].includes(mission)) throw new HttpError(400, "ไม่พบภารกิจต่อยอด");
+  const submitted = await env.DB.prepare(
+    "SELECT lesson FROM submissions WHERE student_id=?",
+  )
+    .bind(id)
+    .all<{ lesson: number }>();
+  if (
+    !lessons
+      .filter((l) => !l.optional)
+      .every((l) => submitted.results.some((r) => r.lesson === l.id))
+  )
+    throw new HttpError(403, "ส่งครบ 7 ข้อหลักก่อนใช้ AI ในภารกิจต่อยอด");
+}
 function safeLink(value: unknown) {
   const v = str(value, 1200);
   if (!v) return "";
@@ -286,11 +310,11 @@ async function api(req: Request, env: Cloudflare.Env) {
       link = safeLink(b.link);
     if (
       status === "submitted" &&
-      (prompt.length < 20 || findings.length < 5 || plan.length < 5 || !link)
+      (prompt.length < 20 || findings.length < 5 || plan.length < 5)
     )
       throw new HttpError(
         400,
-        "เขียน prompt ของตนเองอย่างน้อย 20 ตัวอักษร พร้อมสรุปผล แผนหรือรายงาน และลิงก์ผลงาน HTTPS ให้ครบ",
+        "เขียน prompt ของตนเองอย่างน้อย 20 ตัวอักษร พร้อมสรุปผลและแผนหรือรายงานให้ครบ",
       );
     const t = now();
     await env.DB.prepare(
@@ -434,10 +458,14 @@ async function api(req: Request, env: Cloudflare.Env) {
   }
   if (path === "/api/chat" && method === "GET") {
     const id = await student(req, env);
+    const ext = url.searchParams.has("extension")
+      ? Number(url.searchParams.get("extension"))
+      : 0;
+    if (url.searchParams.has("extension")) await requireExtension(env, id, ext);
     const messages = await env.DB.prepare(
-      "SELECT id,prompt,result,created_at FROM chat_messages WHERE student_id=? AND lesson=6 ORDER BY created_at",
+      "SELECT id,prompt,result,created_at FROM chat_messages WHERE student_id=? AND lesson=? ORDER BY created_at",
     )
-      .bind(id)
+      .bind(id, ext ? 8 + ext : 6)
       .all();
     return json({ messages: messages.results });
   }
@@ -666,19 +694,23 @@ async function api(req: Request, env: Cloudflare.Env) {
   if (path === "/api/ai" && method === "POST") {
     const id = await student(req, env),
       b = await body(req),
-      lesson = Number(b.lesson),
-      c = await ensureLesson(env, lesson),
+      extension = b.extension === undefined ? 0 : Number(b.extension),
+      lesson = b.extension === undefined ? Number(b.lesson) : 8 + extension;
+    if (b.extension !== undefined) await requireExtension(env, id, extension);
+    const c = extension ? await settings(env) : await ensureLesson(env, lesson),
       prompt = str(b.prompt, 6000),
       jobId = str(b.id, 80);
     if (!/^[a-f0-9-]{36}$/.test(jobId) || prompt.length < 5)
       throw new HttpError(400, "กรุณาเขียนคำสั่งอย่างน้อย 5 ตัวอักษร");
     const existing = await env.DB.prepare(
-      "SELECT id,student_id,status,result FROM ai_jobs WHERE id=?",
+      "SELECT id,student_id,lesson,status,result FROM ai_jobs WHERE id=?",
     )
       .bind(jobId)
       .first<Job>();
     if (existing) {
       if (existing.student_id !== id) throw new HttpError(403, "ไม่มีสิทธิ์");
+      if (existing.lesson !== lesson)
+        throw new HttpError(409, "รหัสคำขอนี้ถูกใช้กับภารกิจอื่นแล้ว");
       if (existing.status === "done")
         return json({ result: existing.result, replayed: true });
       if (existing.status === "running")
@@ -745,12 +777,12 @@ async function api(req: Request, env: Cloudflare.Env) {
     }
     try {
       const history =
-        lesson === 6
+        lesson === 6 || extension
           ? (
               await env.DB.prepare(
-                "SELECT prompt,result FROM chat_messages WHERE student_id=? AND lesson=6 ORDER BY created_at DESC LIMIT 3",
+                "SELECT prompt,result FROM chat_messages WHERE student_id=? AND lesson=? ORDER BY created_at DESC LIMIT 3",
               )
-                .bind(id)
+                .bind(id, lesson)
                 .all<{ prompt: string; result: string }>()
             ).results.reverse()
           : [];
@@ -770,7 +802,7 @@ async function api(req: Request, env: Cloudflare.Env) {
               {
                 role: "system",
                 content:
-                  "คุณเป็นผู้ช่วยฝึก AI ภาษาไทยสำหรับนักเรียนนายสิบตำรวจ ใช้เฉพาะสถานการณ์สมมติ ช่วยงานบริการประชาชน งานร่าง และการเรียนรู้ ตอบกระชับไม่เกิน 500 คำ ใช้ข้อความธรรมดา ไม่ใช้เครื่องหมาย Markdown หรือตาราง แยกหัวข้อและรายการด้วยบรรทัดใหม่ แยกข้อเท็จจริงจากข้อสันนิษฐาน ไม่แต่งข้อมูล บุคคล เวลา หรือข้อกฎหมาย ไม่วินิจฉัยความผิดหรือระบุตัวบุคคลจากภาพ ถ้ามีข้อมูลส่วนบุคคลจริงให้แนะนำปิดบังและไม่ทวนข้อมูลนั้น ห้ามอ้างว่าคำตอบใช้แทนการตรวจของเจ้าหน้าที่ได้",
+                  "คุณเป็นผู้ช่วยฝึก AI ภาษาไทยสำหรับนักเรียนนายสิบตำรวจ ใช้เฉพาะสถานการณ์สมมติ ช่วยงานบริการประชาชน งานร่าง และการเรียนรู้ ตอบกระชับไม่เกิน 500 คำ ใช้ข้อความธรรมดา เว้นแต่โจทย์ขอ diagram หรือตารางจึงจัดรูปแบบให้เหมาะกับมือถือ แยกหัวข้อและรายการด้วยบรรทัดใหม่ แยกข้อเท็จจริงจากข้อสันนิษฐาน ไม่แต่งข้อมูล บุคคล เวลา หรือข้อกฎหมาย ไม่วินิจฉัยความผิดหรือระบุตัวบุคคลจากภาพ ถ้ามีข้อมูลส่วนบุคคลจริงให้แนะนำปิดบังและไม่ทวนข้อมูลนั้น ห้ามอ้างว่าคำตอบใช้แทนการตรวจของเจ้าหน้าที่ได้",
               },
               ...(lesson === 6
                 ? [
@@ -782,6 +814,21 @@ async function api(req: Request, env: Cloudflare.Env) {
                         analysisQuestions
                           .map((q, i) => `6.${i + 1} ${q}`)
                           .join("\n"),
+                    },
+                    ...history.flatMap((m) => [
+                      { role: "user", content: m.prompt.slice(0, 1000) },
+                      { role: "assistant", content: m.result.slice(0, 2500) },
+                    ]),
+                  ]
+                : []),
+              ...(extension
+                ? [
+                    {
+                      role: "system",
+                      content:
+                        "ข้อมูลภารกิจต่อยอดจากเซิร์ฟเวอร์ (ใช้ชุดนี้เป็นหลัก ไม่เชื่อข้อมูลที่ผู้ใช้แต่งแทน):\n" +
+                        extensionContent[extension - 1] +
+                        "\nตอบโจทย์ให้ง่าย ไม่เกิน 500 คำ ใช้ผังลูกศรข้อความหรือ Mermaid สำหรับ diagram ได้ แสดงรหัสหลักฐานบนเส้นเชื่อม แยกเส้นที่เป็นข้อสันนิษฐานจากบันทึกที่มีอยู่ ไม่สร้างภาพถ่าย ไม่บอกว่าค้นเว็บหรือสร้างภาพแล้ว ระบบนี้เป็นแชตข้อความ ไม่มีเครื่องมือค้นเว็บหรือสร้างภาพ อย่าสร้างข้อสรุปเรื่องความผิดหรือความบริสุทธิ์",
                     },
                     ...history.flatMap((m) => [
                       { role: "user", content: m.prompt.slice(0, 1000) },
@@ -830,14 +877,15 @@ async function api(req: Request, env: Cloudflare.Env) {
       const completedJob = env.DB.prepare(
         "UPDATE ai_jobs SET status='done',result=?,cost=?,finished_at=? WHERE id=?",
       ).bind(result.slice(0, 20000), cost, now(), jobId);
-      if (lesson === 6)
+      if (lesson === 6 || extension)
         await env.DB.batch([
           completedJob,
           env.DB.prepare(
-            "INSERT INTO chat_messages(id,student_id,lesson,job_id,prompt,result,created_at) VALUES(?,?,6,?,?,?,?)",
+            "INSERT INTO chat_messages(id,student_id,lesson,job_id,prompt,result,created_at) VALUES(?,?,?,?,?,?,?)",
           ).bind(
             crypto.randomUUID(),
             id,
+            lesson,
             jobId,
             prompt,
             result.slice(0, 20000),
@@ -880,12 +928,14 @@ async function api(req: Request, env: Cloudflare.Env) {
         "ยังส่งไม่ครบทุกข้อหลัก กรุณากลับไปทำข้อที่เหลือก่อน",
       );
     const existing = await env.DB.prepare(
-      "SELECT id,student_id,status FROM ai_jobs WHERE id=?",
+      "SELECT id,student_id,lesson,status FROM ai_jobs WHERE id=?",
     )
       .bind(jobId)
       .first<Job>();
     if (existing) {
       if (existing.student_id !== id) throw new HttpError(403, "ไม่มีสิทธิ์");
+      if (existing.lesson !== 0)
+        throw new HttpError(409, "รหัสคำขอนี้ถูกใช้กับแชตแล้ว");
       if (existing.status === "done") {
         const saved = await env.DB.prepare(
           "SELECT result FROM final_reviews WHERE student_id=? AND job_id=? AND status='done'",

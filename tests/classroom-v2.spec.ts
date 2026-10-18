@@ -259,8 +259,9 @@ test("real analysis chat uses server dataset, retains history, does not duplicat
 test("final AI review requires every required lesson, grades with scores and link checks, replays", async () => {
   test.setTimeout(180000);
   expect(
-    (await student.post("/api/final-review", { data: { id: randomUUID() } }))
-      .status(),
+    (
+      await student.post("/api/final-review", { data: { id: randomUUID() } })
+    ).status(),
   ).toBe(400);
   for (const lesson of [2, 3, 4, 5]) {
     expect(
@@ -377,9 +378,7 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
       "ตำรวจสายตรวจมีหน้าที่ดูแลความปลอดภัย ป้องกันเหตุ และช่วยเหลือประชาชน",
     );
   await page.getByRole("button", { name: "ส่งคำตอบ", exact: true }).click();
-  await expect(
-    page.getByText("ส่งคำตอบแล้ว — กำลังไปข้อถัดไป"),
-  ).toBeVisible();
+  await expect(page.getByText("ส่งคำตอบแล้ว — กำลังไปข้อถัดไป")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "ถามเรื่องกฎหมาย", exact: true }),
   ).toBeVisible({ timeout: 6000 });
@@ -401,7 +400,10 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
   await page.getByRole("button", { name: "ส่งคำตอบ", exact: true }).click();
   await expect(page.locator(".form-success")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "แปลคำแจ้งความ", exact: true }),
+    page.getByRole("heading", {
+      name: "แปลภาษาจีน แล้วช่วยผู้มาติดต่อ",
+      exact: true,
+    }),
   ).toBeVisible({ timeout: 6000 });
   await page
     .getByLabel("คำตอบ", { exact: true })
@@ -435,7 +437,7 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
     fullPage: true,
   });
   await expect(
-    page.getByRole("heading", { name: "อธิบายสิ่งที่เห็นในภาพ", exact: true }),
+    page.getByRole("heading", { name: "วัตถุนี้อาจเป็นอะไร?", exact: true }),
   ).toBeVisible({ timeout: 6000 });
   await expect
     .poll(async () =>
@@ -624,8 +626,8 @@ test("removed PIN endpoints stay closed; logout invalidates the session", async 
   ).toBeTruthy();
   const outsider = await factory.newContext({ baseURL: base });
   expect((await outsider.get("/api/chat")).status()).toBe(401);
-  expect(
-    (await outsider.get(`/api/admin/student/${studentId}`)).status(),
-  ).toBe(401);
+  expect((await outsider.get(`/api/admin/student/${studentId}`)).status()).toBe(
+    401,
+  );
   await outsider.dispose();
 });

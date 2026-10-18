@@ -2128,3 +2128,31 @@ body {
     margin-inline: auto;
   }
 }
+
+.extension-internal-ai {
+  border: 1px solid #b99a54;
+  border-radius: 14px;
+  padding: 16px;
+  background: #fffdf7;
+  min-width: 0;
+}
+.extension-ai-history {
+  max-height: 65vh;
+  overflow: auto;
+  margin: 12px 0;
+}
+.extension-ai-history article {
+  border-top: 1px solid #e0d5c2;
+  padding: 14px 0;
+}
+.extension-ai-history pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.8;
+  font-size: 15px;
+}
+.extension-internal-ai .btn {
+  white-space: normal;
+  min-height: 48px;
+}

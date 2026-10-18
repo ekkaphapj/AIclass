@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "wrangler dev --port 8787",
     "test": "playwright test",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "test:extension-ai": "node --test scripts/test-extension-ai.mjs"
   },
   "keywords": [],
   "author": "",

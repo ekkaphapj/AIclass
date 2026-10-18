@@ -123,6 +123,23 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
         })
       ).status(),
     ).toBe(400);
+
+    const mockHistory: Record<
+      number,
+      { id: string; prompt: string; result: string }[]
+    > = { 1: [], 2: [] };
+    await context.route("**/api/chat?extension=*", async (route) => {
+      const m = Number(
+        new URL(route.request().url()).searchParams.get("extension"),
+      );
+      await route.fulfill({ json: { messages: mockHistory[m] || [] } });
+    });
+    await context.route("**/api/ai", async (route) => {
+      const b = route.request().postDataJSON();
+      const result = `diagram ข้อ ${b.extension}: หลักฐาน fixture → ตรวจเพิ่ม`;
+      mockHistory[b.extension].push({ id: b.id, prompt: b.prompt, result });
+      await route.fulfill({ json: { result } });
+    });
     const page = await context.newPage();
     await page.addInitScript(() =>
       Object.defineProperty(navigator, "clipboard", {
@@ -182,13 +199,30 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     expect(
       await page.evaluate(() => sessionStorage.getItem("test-copied")),
     ).toContain("ไม่ตัดสินว่าใครผิด");
+    await page
+      .getByRole("button", { name: "ถาม OpenRouter ด้วย prompt ด้านบน" })
+      .click();
+    await expect(
+      page.getByText("diagram ข้อ 1: หลักฐาน fixture → ตรวจเพิ่ม", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "คัดลอกคำตอบ AI", exact: true })
+      .click();
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("test-copied")),
+    ).toContain("diagram ข้อ 1");
     await page.screenshot({
       path: "test-results/extensions-mobile-prompt.png",
       fullPage: true,
     });
     await page.getByRole("button", { name: "ต่อไป: ส่งงาน →" }).click();
+    await expect(
+      page.getByLabel("ผลวิเคราะห์ + diagram การเชื่อมโยง"),
+    ).toHaveValue("");
     await page
-      .getByLabel("สรุปที่ได้จาก AI + ผัง / timeline")
+      .getByLabel("ผลวิเคราะห์ + diagram การเชื่อมโยง")
       .fill(
         "R4 เวลา 14:16 เบอร์ 095-999 ใช้ IMEI-AAA และ R9 ติดต่อเบอร์นายตรี",
       );
@@ -198,7 +232,7 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
         "ควรตรวจผู้ใช้เครื่องและความสัมพันธ์การติดต่อ ยังระบุตัวคนถือเครื่องไม่ได้ ต้องตรวจภาพต้นฉบับเพิ่ม",
       );
     await page
-      .getByLabel("ลิงก์ภาพหรือผลงาน Gemini (HTTPS)")
+      .getByLabel("ลิงก์ diagram หรือผลงาน Gemini (ถ้ามี, HTTPS)")
       .fill("https://example.com/timeline");
     await page.getByRole("button", { name: "บันทึกร่าง", exact: true }).click();
     await expect(page.getByRole("status")).toContainText(
@@ -212,7 +246,7 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     );
     await page.getByRole("button", { name: "3. ส่งงาน", exact: true }).click();
     await expect(
-      page.getByLabel("สรุปที่ได้จาก AI + ผัง / timeline"),
+      page.getByLabel("ผลวิเคราะห์ + diagram การเชื่อมโยง"),
     ).toHaveValue(/14:16/);
     await page.getByText("สร้างภาพไม่ทัน?", { exact: true }).click();
     const pictureDownload = page.waitForEvent("download");
@@ -257,8 +291,21 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
       .getByRole("button", { name: "ใช้ตัวอย่าง prompt", exact: true })
       .click();
     await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
-      /ครบ 20/,
+      /ได้ 20/,
     );
+    await page
+      .getByRole("button", { name: "ถาม OpenRouter ด้วย prompt ด้านบน" })
+      .click();
+    await expect(
+      page.getByText("diagram ข้อ 2: หลักฐาน fixture → ตรวจเพิ่ม", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("diagram ข้อ 1: หลักฐาน fixture → ตรวจเพิ่ม", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
     await page.getByRole("button", { name: "3. ส่งงาน", exact: true }).click();
     await page
       .getByLabel("ตาราง / กราฟ / ผังที่ได้จาก AI")
@@ -269,7 +316,7 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
         "เช้าตลาด บ่ายหมู่บ้าน ค่ำและดึกหอพักกับเลี่ยงเมือง คงรถพร้อมรับเหตุหนึ่งชุด เตือนเก็บทรัพย์และล็อกรถ",
       );
     await page
-      .getByLabel("ลิงก์ภาพหรือผลงาน Gemini (HTTPS)")
+      .getByLabel("ลิงก์ diagram หรือผลงาน Gemini (ถ้ามี, HTTPS)")
       .fill("https://example.com/clock");
     await page
       .getByRole("button", { name: "ส่งภารกิจต่อยอด 2", exact: true })
