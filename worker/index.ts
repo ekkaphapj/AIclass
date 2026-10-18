@@ -1,3 +1,4 @@
+import { extensionContent } from "./extension-content";
 import {
   lessons,
   quizQuestions,
@@ -196,7 +197,11 @@ function parseGrading(text: string, requiredIds: number[]) {
     if (!Array.isArray(data.lessons)) return null;
     const rows: { lesson: number; score: number; comment: string }[] = [];
     for (const item of data.lessons) {
-      const l = item as { lesson?: unknown; score?: unknown; comment?: unknown };
+      const l = item as {
+        lesson?: unknown;
+        score?: unknown;
+        comment?: unknown;
+      };
       const lesson = Number(l.lesson),
         score = Number(l.score);
       if (!Number.isInteger(lesson) || lesson < 1 || lesson > lessons.length)
@@ -206,14 +211,18 @@ function parseGrading(text: string, requiredIds: number[]) {
       rows.push({
         lesson,
         score: Math.round(score * 2) / 2,
-        comment: typeof l.comment === "string" ? l.comment.trim().slice(0, 400) : "",
+        comment:
+          typeof l.comment === "string" ? l.comment.trim().slice(0, 400) : "",
       });
     }
     if (!requiredIds.every((rid) => rows.some((r) => r.lesson === rid)))
       return null;
     return {
       lessons: rows,
-      summary: typeof data.summary === "string" ? data.summary.trim().slice(0, 800) : "",
+      summary:
+        typeof data.summary === "string"
+          ? data.summary.trim().slice(0, 800)
+          : "",
     };
   } catch {
     return null;
@@ -231,6 +240,85 @@ async function api(req: Request, env: Cloudflare.Env) {
       throw new HttpError(403, "ไม่อนุญาตคำขอจากเว็บไซต์อื่น");
     if (req.headers.get("Sec-Fetch-Site") === "cross-site")
       throw new HttpError(403, "ไม่อนุญาตคำขอข้ามเว็บไซต์");
+  }
+  if (path === "/api/extensions" && method === "GET") {
+    const id = await student(req, env);
+    const submitted = await env.DB.prepare(
+      "SELECT lesson FROM submissions WHERE student_id=?",
+    )
+      .bind(id)
+      .all<{ lesson: number }>();
+    const unlocked = lessons
+      .filter((l) => !l.optional)
+      .every((l) => submitted.results.some((s) => s.lesson === l.id));
+    const work = await env.DB.prepare(
+      "SELECT * FROM extension_work WHERE student_id=?",
+    )
+      .bind(id)
+      .all();
+    return json({
+      unlocked,
+      content: unlocked ? extensionContent : [],
+      work: work.results,
+    });
+  }
+  if (path === "/api/extensions" && method === "POST") {
+    const id = await student(req, env);
+    const submitted = await env.DB.prepare(
+      "SELECT lesson FROM submissions WHERE student_id=?",
+    )
+      .bind(id)
+      .all<{ lesson: number }>();
+    if (
+      !lessons
+        .filter((l) => !l.optional)
+        .every((l) => submitted.results.some((s) => s.lesson === l.id))
+    )
+      throw new HttpError(403, "ส่งครบ 7 ข้อหลักก่อนเริ่มภารกิจต่อยอด");
+    const b = await body(req),
+      mission = Number(b.mission);
+    if (![1, 2].includes(mission)) throw new HttpError(400, "ไม่พบภารกิจ");
+    const status = b.status === "submitted" ? "submitted" : "started";
+    const findings = str(b.findings, 8000),
+      plan = str(b.plan, 8000),
+      link = safeLink(b.link);
+    if (
+      status === "submitted" &&
+      (findings.length < 5 || plan.length < 5 || !link)
+    )
+      throw new HttpError(
+        400,
+        "กรอกข้อค้นพบ แผน/ข้อจำกัด และลิงก์ภาพ HTTPS ให้ครบ",
+      );
+    const t = now();
+    await env.DB.prepare(
+      `INSERT INTO extension_work(student_id,mission,status,findings,plan,link,started_at,updated_at,submitted_at)
+      VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(student_id,mission) DO UPDATE SET
+      status=excluded.status,findings=excluded.findings,plan=excluded.plan,link=excluded.link,
+      updated_at=excluded.updated_at,submitted_at=excluded.submitted_at`,
+    )
+      .bind(
+        id,
+        mission,
+        status,
+        findings,
+        plan,
+        link,
+        t,
+        t,
+        status === "submitted" ? t : null,
+      )
+      .run();
+    return json({ ok: true });
+  }
+  if (path.startsWith("/api/admin/extensions/") && method === "GET") {
+    await admin(req, env);
+    const work = await env.DB.prepare(
+      "SELECT * FROM extension_work WHERE student_id=? ORDER BY mission",
+    )
+      .bind(path.split("/").pop())
+      .all();
+    return json({ work: work.results });
   }
   if (path === "/api/health") return json({ ok: true, app: "ai-class-p4" });
   if (path === "/api/config" && method === "GET") {
@@ -253,11 +341,7 @@ async function api(req: Request, env: Cloudflare.Env) {
     const number = str(b.number, 12),
       name = str(b.name, 100),
       squad = str(b.squad, 30);
-    if (
-      !/^\d{1,6}$/.test(number) ||
-      name.length < 2 ||
-      !/^[1-5]$/.test(squad)
-    )
+    if (!/^\d{1,6}$/.test(number) || name.length < 2 || !/^[1-5]$/.test(squad))
       throw new HttpError(
         400,
         "กรุณากรอกเลขประจำตัวนักเรียน ชื่อ-นามสกุล และเลือกกลุ่มเรียน 1–5",
@@ -909,21 +993,20 @@ async function api(req: Request, env: Cloudflare.Env) {
         `; ลักทรัพย์ช่วง 18:00–23:59 มี ${ref.theftEvening} เหตุ โดยหนองแสง ${ref.theftNongSaengEvening} เหตุ; ปล้นบ้านใหม่ช่วง 18:00–23:59 มี ${ref.robberyBanMaiEvening} เหตุ; ข้อ 6.5 เป็นแผนปลายเปิด ดูความสอดคล้องกับข้อมูลและการระบุข้อจำกัดของข้อมูล`;
       const parts = subs
         .filter(
-          (s) =>
-            lessons.find((x) => x.id === s.lesson)?.answerType !== "link",
+          (s) => lessons.find((x) => x.id === s.lesson)?.answerType !== "link",
         )
         .map((s) => {
-        const info = lessons.find((l) => l.id === s.lesson)!;
-        return (
-          `### ข้อ ${s.lesson} — ${info.title}${info.optional ? " (ข้อไม่บังคับ)" : ""}\n` +
-          `โจทย์: ${info.starter.slice(0, 500)}\n` +
-          `คำตอบผู้เรียน: ${s.result.slice(0, 2500)}` +
-          (s.link
-            ? `\nลิงก์ผลงาน: ${s.link}\nผลตรวจลิงก์โดยระบบ: ${linkText(s.lesson)}`
-            : "") +
-          (s.lesson === 6 ? `\n${key6}` : "")
-        );
-      });
+          const info = lessons.find((l) => l.id === s.lesson)!;
+          return (
+            `### ข้อ ${s.lesson} — ${info.title}${info.optional ? " (ข้อไม่บังคับ)" : ""}\n` +
+            `โจทย์: ${info.starter.slice(0, 500)}\n` +
+            `คำตอบผู้เรียน: ${s.result.slice(0, 2500)}` +
+            (s.link
+              ? `\nลิงก์ผลงาน: ${s.link}\nผลตรวจลิงก์โดยระบบ: ${linkText(s.lesson)}`
+              : "") +
+            (s.lesson === 6 ? `\n${key6}` : "")
+          );
+        });
       const response = await fetch(
         "https://openrouter.ai/api/v1/chat/completions",
         {
@@ -940,7 +1023,7 @@ async function api(req: Request, env: Cloudflare.Env) {
               {
                 role: "system",
                 content:
-                  "คุณเป็นผู้ช่วยตรวจงานในชั้นเรียน AI สำหรับนักเรียนนายสิบตำรวจ ข้อมูลทั้งหมดเป็นสถานการณ์สมมติ หน้าที่คือให้คะแนนคำตอบข้อเขียนแต่ละข้อแบบไม่ต้องละเอียด ใช้เกณฑ์นี้: ถ้าคำตอบถูกต้องและครบถ้วนตามโจทย์ ให้ 7 คะแนน แล้วเพิ่มได้อีกสูงสุด 3 คะแนนจากความละเอียด ตัวอย่าง ความชัดเจน และการระบุข้อจำกัดของข้อมูล (รวมสูงสุด 10) ถ้าคำตอบผิด ตกหล่น หรือไม่ตรงคำถาม ให้ 0–6 ตามความผิดพลาด ข้อ 6 เทียบตัวเลขกับเฉลยอ้างอิงที่แนบให้ ตัวเลขครบและถูกต้องถือว่าครบถ้วน ห้ามวินิจฉัยความผิดของบุคคล ความเห็นต่อข้อยาวไม่เกิน 80 ตัวอักษร ตอบกลับเป็น JSON เท่านั้น ตามรูปแบบ {\"lessons\":[{\"lesson\":เลขข้อ,\"score\":คะแนน 0-10,\"comment\":\"เหตุผลสั้น\"}],\"summary\":\"สรุปภาพรวม 2-3 ประโยค\"} ห้ามเขียนข้อความอื่นนอกจาก JSON",
+                  'คุณเป็นผู้ช่วยตรวจงานในชั้นเรียน AI สำหรับนักเรียนนายสิบตำรวจ ข้อมูลทั้งหมดเป็นสถานการณ์สมมติ หน้าที่คือให้คะแนนคำตอบข้อเขียนแต่ละข้อแบบไม่ต้องละเอียด ใช้เกณฑ์นี้: ถ้าคำตอบถูกต้องและครบถ้วนตามโจทย์ ให้ 7 คะแนน แล้วเพิ่มได้อีกสูงสุด 3 คะแนนจากความละเอียด ตัวอย่าง ความชัดเจน และการระบุข้อจำกัดของข้อมูล (รวมสูงสุด 10) ถ้าคำตอบผิด ตกหล่น หรือไม่ตรงคำถาม ให้ 0–6 ตามความผิดพลาด ข้อ 6 เทียบตัวเลขกับเฉลยอ้างอิงที่แนบให้ ตัวเลขครบและถูกต้องถือว่าครบถ้วน ห้ามวินิจฉัยความผิดของบุคคล ความเห็นต่อข้อยาวไม่เกิน 80 ตัวอักษร ตอบกลับเป็น JSON เท่านั้น ตามรูปแบบ {"lessons":[{"lesson":เลขข้อ,"score":คะแนน 0-10,"comment":"เหตุผลสั้น"}],"summary":"สรุปภาพรวม 2-3 ประโยค"} ห้ามเขียนข้อความอื่นนอกจาก JSON',
               },
               {
                 role: "user",
@@ -1000,7 +1083,8 @@ async function api(req: Request, env: Cloudflare.Env) {
         )
         .map((s) => {
           const k = checks.find((x) => x.lesson === s.lesson),
-            state = !k || !k.status ? "uncertain" : k.status < 400 ? "ok" : "broken";
+            state =
+              !k || !k.status ? "uncertain" : k.status < 400 ? "ok" : "broken";
           return {
             lesson: s.lesson,
             score: state === "ok" ? 10 : state === "broken" ? 0 : 7,
@@ -1014,7 +1098,9 @@ async function api(req: Request, env: Cloudflare.Env) {
           };
         });
       const allRows = [
-        ...graded.lessons.filter((l) => subs.some((s) => s.lesson === l.lesson)),
+        ...graded.lessons.filter((l) =>
+          subs.some((s) => s.lesson === l.lesson),
+        ),
         ...linkRows,
       ].sort((a, b) => a.lesson - b.lesson);
       const scores = requiredIds.map(
@@ -1056,21 +1142,21 @@ async function api(req: Request, env: Cloudflare.Env) {
     await admin(req, env);
     const [c, students, submissions, quizzes, usage, reviews] =
       await Promise.all([
-      settings(env),
-      env.DB.prepare(
-        `SELECT ${projection} FROM students ORDER BY CAST(number AS INTEGER)`,
-      ).all<Student>(),
-      env.DB.prepare(
-        "SELECT id,student_id,lesson,status,score,media_state,submitted_at,updated_at FROM submissions ORDER BY updated_at DESC",
-      ).all(),
-      env.DB.prepare("SELECT student_id,kind,score FROM quizzes").all(),
-      env.DB.prepare(
-        "SELECT COUNT(*) total,SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) completed,SUM(CASE WHEN status='running' THEN 1 ELSE 0 END) running,COALESCE(SUM(cost),0) cost FROM ai_jobs",
-      ).first(),
-      env.DB.prepare(
-        "SELECT student_id,result,created_at FROM final_reviews WHERE status='done'",
-      ).all(),
-    ]);
+        settings(env),
+        env.DB.prepare(
+          `SELECT ${projection} FROM students ORDER BY CAST(number AS INTEGER)`,
+        ).all<Student>(),
+        env.DB.prepare(
+          "SELECT id,student_id,lesson,status,score,media_state,submitted_at,updated_at FROM submissions ORDER BY updated_at DESC",
+        ).all(),
+        env.DB.prepare("SELECT student_id,kind,score FROM quizzes").all(),
+        env.DB.prepare(
+          "SELECT COUNT(*) total,SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) completed,SUM(CASE WHEN status='running' THEN 1 ELSE 0 END) running,COALESCE(SUM(cost),0) cost FROM ai_jobs",
+        ).first(),
+        env.DB.prepare(
+          "SELECT student_id,result,created_at FROM final_reviews WHERE status='done'",
+        ).all(),
+      ]);
     return json({
       settings: c,
       students: students.results,
@@ -1078,6 +1164,11 @@ async function api(req: Request, env: Cloudflare.Env) {
       quizzes: quizzes.results,
       usage,
       finalReviews: reviews.results,
+      extensionWork: (
+        await env.DB.prepare(
+          "SELECT student_id,mission,status,started_at,updated_at,submitted_at FROM extension_work",
+        ).all()
+      ).results,
       serverTime: now(),
       model: env.AI_MODEL,
     });

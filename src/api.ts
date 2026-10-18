@@ -1,3 +1,4 @@
+import type { ExtensionWork } from "../shared/extensions";
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -99,6 +100,7 @@ export type Settings = Config & {
   max_requests: number;
 };
 export type Overview = {
+  extensionWork: ExtensionWork[];
   settings: Settings;
   students: Person[];
   submissions: Submission[];

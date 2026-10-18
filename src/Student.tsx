@@ -1,3 +1,4 @@
+import { Extensions } from "./Extensions";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ShieldCheck,
@@ -139,26 +140,22 @@ export default function StudentApp({
     me.submissions.some((s) => s.lesson === l.id),
   );
   const [active, setActive] = useState(() => {
-    try {
-      const stored = Number(localStorage.getItem(`p4-page-${me.student.id}`));
-      if (stored >= 1 && stored <= lessons.length) return stored;
-    } catch {}
-    const server = Number(me.student.current_lesson);
-    if (server >= 1 && server <= lessons.length) return server;
-    return (
-      requiredLessons.find(
-        (l) => !me.submissions.some((s) => s.lesson === l.id),
-      )?.id || 1
-    );
-  }),
+      try {
+        const stored = Number(localStorage.getItem(`p4-page-${me.student.id}`));
+        if (stored >= 1 && stored <= lessons.length) return stored;
+      } catch {}
+      const server = Number(me.student.current_lesson);
+      if (server >= 1 && server <= lessons.length) return server;
+      return (
+        requiredLessons.find(
+          (l) => !me.submissions.some((s) => s.lesson === l.id),
+        )?.id || 1
+      );
+    }),
     [view, setView] = useState<"home" | "exercise" | "quiz" | "final">(() => {
       try {
         const stored = sessionStorage.getItem(`p4-view-${me.student.id}`);
-        if (
-          stored === "exercise" ||
-          stored === "quiz" ||
-          stored === "final"
-        )
+        if (stored === "exercise" || stored === "quiz" || stored === "final")
           return stored;
       } catch {}
       return "home";
@@ -270,56 +267,58 @@ export default function StudentApp({
       </header>
       <main className="exercise-main">
         {view !== "home" && (
-        <section className="exercise-progress">
-          <div className="progress-title">
-            <span>{me.student.name}</span>
-            <strong>
-              ส่งแล้ว {completed} / {requiredLessons.length} ข้อหลัก
-            </strong>
-          </div>
-          <div className="exercise-progress-track">
-            <i
-              style={{
-                width: `${(completed / requiredLessons.length) * 100}%`,
-              }}
-            />
-          </div>
-          <div className="exercise-steps" aria-label="เลือกข้อแบบฝึกหัด">
-            {lessons.map((l) => {
-              const sent = me.submissions.some((s) => s.lesson === l.id);
-              return (
-                <button
-                  key={l.id}
-                  aria-current={
-                    view === "exercise" && active === l.id ? "step" : undefined
-                  }
-                  aria-label={`ข้อ ${l.id} ${l.title}${l.optional ? " (ไม่บังคับ)" : ""}${sent ? " ส่งแล้ว" : ""}`}
-                  className={`${active === l.id && view === "exercise" ? "current" : ""} ${sent ? "done" : ""}`}
-                  onClick={() => navigate(l.id)}
-                  disabled={
-                    !!config.lock_following && l.id > config.active_lesson
-                  }
-                >
-                  <span>{sent ? <Check size={17} /> : l.id}</span>
-                  <small>{l.optional ? "ไม่บังคับ" : `ข้อ ${l.id}`}</small>
-                </button>
-              );
-            })}
-          </div>
-          {allRequiredDone && view !== "final" && (
-            <button
-              className="final-cta"
-              onClick={() => {
-                cancelFinalSwitch();
-                setView("final");
-                window.scrollTo({ top: 0, behavior: "instant" });
-              }}
-            >
-              <Award size={18} />
-              ตอบครบทุกข้อหลักแล้ว — ส่งคำตอบทั้งหมดและดูคะแนนรวม
-            </button>
-          )}
-        </section>
+          <section className="exercise-progress">
+            <div className="progress-title">
+              <span>{me.student.name}</span>
+              <strong>
+                ส่งแล้ว {completed} / {requiredLessons.length} ข้อหลัก
+              </strong>
+            </div>
+            <div className="exercise-progress-track">
+              <i
+                style={{
+                  width: `${(completed / requiredLessons.length) * 100}%`,
+                }}
+              />
+            </div>
+            <div className="exercise-steps" aria-label="เลือกข้อแบบฝึกหัด">
+              {lessons.map((l) => {
+                const sent = me.submissions.some((s) => s.lesson === l.id);
+                return (
+                  <button
+                    key={l.id}
+                    aria-current={
+                      view === "exercise" && active === l.id
+                        ? "step"
+                        : undefined
+                    }
+                    aria-label={`ข้อ ${l.id} ${l.title}${l.optional ? " (ไม่บังคับ)" : ""}${sent ? " ส่งแล้ว" : ""}`}
+                    className={`${active === l.id && view === "exercise" ? "current" : ""} ${sent ? "done" : ""}`}
+                    onClick={() => navigate(l.id)}
+                    disabled={
+                      !!config.lock_following && l.id > config.active_lesson
+                    }
+                  >
+                    <span>{sent ? <Check size={17} /> : l.id}</span>
+                    <small>{l.optional ? "ไม่บังคับ" : `ข้อ ${l.id}`}</small>
+                  </button>
+                );
+              })}
+            </div>
+            {allRequiredDone && view !== "final" && (
+              <button
+                className="final-cta"
+                onClick={() => {
+                  cancelFinalSwitch();
+                  setView("final");
+                  window.scrollTo({ top: 0, behavior: "instant" });
+                }}
+              >
+                <Award size={18} />
+                ตอบครบทุกข้อหลักแล้ว — ส่งคำตอบทั้งหมดและดูคะแนนรวม
+              </button>
+            )}
+          </section>
         )}
         {view === "home" ? (
           <StudentHome
@@ -358,6 +357,12 @@ export default function StudentApp({
             onCompletedAll={scheduleFinalSwitch}
           />
         )}
+        {(view === "home" || view === "final") && (
+          <Extensions
+            key={`${me.student.id}-${allRequiredDone}`}
+            studentId={me.student.id}
+          />
+        )}
         <footer className="student-simple-footer">
           <span>AI Police Lab · By: Dr.Ake</span>
           <div>
@@ -383,10 +388,7 @@ export default function StudentApp({
         </div>
       )}
       {modal && (
-        <MiniModal
-          title="แจ้งปัญหาให้ผู้สอน"
-          onClose={() => setModal(null)}
-        >
+        <MiniModal title="แจ้งปัญหาให้ผู้สอน" onClose={() => setModal(null)}>
           <div className="stack">
             {[
               "เข้า Gemini / ChatGPT ไม่ได้",
@@ -551,12 +553,10 @@ function Exercise({
       const completesAll =
         !wasComplete &&
         requiredLessons.every(
-          (r) =>
-            r.id === l.id || me.submissions.some((s) => s.lesson === r.id),
+          (r) => r.id === l.id || me.submissions.some((s) => s.lesson === r.id),
         );
       // ข้อ 6 ไม่เลื่อนอัตโนมัติ เพื่อให้ใช้แชตวิเคราะห์ต่อหลังส่งคำตอบได้
-      const advancing =
-        !completesAll && l.id < lessons.length && l.id !== 6;
+      const advancing = !completesAll && l.id < lessons.length && l.id !== 6;
       setSuccess(
         advancing
           ? "ส่งคำตอบแล้ว — กำลังไปข้อถัดไป"
@@ -1080,8 +1080,7 @@ function StudentHome({
   const saved = me.finalReview;
   let ai: FinalReviewResult | null = null;
   try {
-    ai =
-      saved && saved.status === "done" ? JSON.parse(saved.result) : null;
+    ai = saved && saved.status === "done" ? JSON.parse(saved.result) : null;
   } catch {}
   const completed = requiredLessons.filter((l) =>
     me.submissions.some((s) => s.lesson === l.id),
@@ -1216,8 +1215,7 @@ function FinalReview({
   const saved = me.finalReview;
   let result: FinalReviewResult | null = null;
   try {
-    result =
-      saved && saved.status === "done" ? JSON.parse(saved.result) : null;
+    result = saved && saved.status === "done" ? JSON.parse(saved.result) : null;
   } catch {}
   const stale = !!(
     result &&
@@ -1358,8 +1356,8 @@ function FinalReview({
       )}
       <div className="answer-submit final-submit">
         <small>
-          ผลตรวจของ AI เป็นเบื้องต้นเพื่อช่วยการเรียนรู้ คะแนนที่แท้จริงมาจากผู้สอน
-          · ตรวจได้สูงสุด 5 ครั้ง
+          ผลตรวจของ AI เป็นเบื้องต้นเพื่อช่วยการเรียนรู้
+          คะแนนที่แท้จริงมาจากผู้สอน · ตรวจได้สูงสุด 5 ครั้ง
         </small>
         <Btn type="button" busy={busy} onClick={() => void run()}>
           <Award size={18} />

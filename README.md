@@ -58,3 +58,19 @@ Images and provenance: [training assets](docs/training-assets.md). Screenshots/r
 ## Data
 
 Opaque hashed sessions, HttpOnly/SameSite cookies (Secure on HTTPS), role/ownership checks, parameterized SQL, bounded input, per-IP and per-student login throttles, HTTPS link validation, private legacy attachments, cross-origin write rejection, safe text rendering and CSV formula escaping. No third-party font requests or analytics. This remains a single class without automatic retention/deletion. Use fictional/public training material only. Real legal/procedural content requires checking against official sources and the unit's approved procedures.
+
+## Extension missions (October 2026)
+
+After all seven required original exercises are submitted, students can open two separate 10–15 minute missions from home or the final-summary page: a fictional investigation with witness/CDR/vehicle records, and a 68-incident community patrol planning exercise. Server-side gating protects the content and submissions. Original course completion and grades are unchanged.
+
+Extension answers and HTTPS presentation links live in `extension_work` (migration 0004). Drafts save locally while typing; the explicit save button persists across devices. Saving a draft after submission changes its status back to started. Students can export a PNG timeline/clock template, then share the image through their chosen service and submit its HTTPS link. The scene asset is an illustrative plan, not a photograph. External AI calls are made in the learner's chosen AI service.
+
+Instructor overview shows group-filtered started/submitted totals and per-student A/B states (locked, ready, started, submitted). Click either status to inspect drafts, answers and presentation links. Extension grading remains separate from original scores. Design and instructor reference: [Thai extension guide](docs/ภารกิจต่อยอด-สองสถานการณ์.md).
+
+Focused local checks without paid provider requests:
+
+```powershell
+npx playwright test tests/extensions.spec.ts tests/classroom-v2.spec.ts --grep "extension gating|self-entered|returning login"
+```
+
+The legacy budget test requires a nonempty local API key value to reach admission checks; an explicitly fake local test placeholder suffices for this filtered command. Do not run live AI tests with a placeholder or upload local test secrets.

@@ -73,5 +73,43 @@
   "optionalExercises": [
     7
   ],
-  "deploymentVersion": "3dfd08af-4027-41c9-9aff-bfd95b5aa902"
+  "deploymentVersion": "3dfd08af-4027-41c9-9aff-bfd95b5aa902",
+  "extensionRelease": {
+    "date": "2026-10-18",
+    "version": "59cafff8-876b-4487-92ec-2e7f295c3ef2",
+    "migration": "0004_extensions.sql applied local and remote",
+    "typecheck": "passed",
+    "build": "passed (existing lucide-react directive warnings)",
+    "playwright": {
+      "command": "npx playwright test tests/extensions.spec.ts tests/classroom-v2.spec.ts --grep \"extension gating|self-entered|returning login\"",
+      "passed": 3,
+      "seconds": 4.3,
+      "scope": "Focused local checks, no real provider calls; not a full suite run",
+      "coverage": [
+        "server gating before seven required submissions",
+        "optional lesson 7 not needed",
+        "mission validation and HTTPS enforcement",
+        "student/admin authorization",
+        "draft save and reload",
+        "PNG export",
+        "extension submission and instructor A/B statuses",
+        "mobile width 390x844",
+        "original registration, validation, lesson lock, budget and returning-login checks"
+      ],
+      "environment": "Nonempty fake API key in ignored local .dev.vars to reach budget admission; never uploaded",
+      "notes": "An earlier run had a transient Playwright worker process crash before extension test execution; full focused command subsequently passed."
+    },
+    "productionReadOnly": {
+      "health": 200,
+      "instructorPage": 200,
+      "sceneAsset": 200,
+      "anonymousExtensions": 401
+    },
+    "limits": [
+      "No live external AI regression or physical mobile test",
+      "Scene is an illustrative plan, not a generated photograph",
+      "Presentation images submitted through HTTPS links, no direct image upload",
+      "Extension scores are not integrated into original grading"
+    ]
+  }
 }

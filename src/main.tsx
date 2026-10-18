@@ -1,3 +1,4 @@
+import { InstructorExtension } from "./Extensions";
 import StudentApp from "./Student";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createRoot } from "react-dom/client";
@@ -367,19 +368,28 @@ function Login({
                 <span className="pill">P4 CLASSROOM</span>
               </div>
               <h2>เข้าใช้งานในบทบาทใด</h2>
-              <p className="muted">นักเรียนลงชื่อเพื่อทำแบบฝึกหัด · ผู้สอนดูแลห้องเรียน</p>
+              <p className="muted">
+                นักเรียนลงชื่อเพื่อทำแบบฝึกหัด · ผู้สอนดูแลห้องเรียน
+              </p>
               <div className="role-cards">
-                <button className="role-card" onClick={() => setRole("student")}>
+                <button
+                  className="role-card"
+                  onClick={() => setRole("student")}
+                >
                   <span className="role-icon student">
                     <GraduationCap size={30} />
                   </span>
                   <b>นักเรียน</b>
                   <small>
-                    ลงทะเบียนด้วยเลขประจำตัวนักเรียนของคุณ หรือเข้าสู่ระบบด้วยเลขเดิม
+                    ลงทะเบียนด้วยเลขประจำตัวนักเรียนของคุณ
+                    หรือเข้าสู่ระบบด้วยเลขเดิม
                   </small>
                   <ArrowRight size={18} />
                 </button>
-                <button className="role-card" onClick={() => setRole("teacher")}>
+                <button
+                  className="role-card"
+                  onClick={() => setRole("teacher")}
+                >
                   <span className="role-icon teacher">
                     <Monitor size={27} />
                   </span>
@@ -389,7 +399,8 @@ function Login({
                 </button>
               </div>
               <div className="enroll-note">
-                <ShieldCheck size={16} /> ไม่ต้องติดตั้งแอป · ใช้งานผ่านเบราว์เซอร์บนมือถือ
+                <ShieldCheck size={16} /> ไม่ต้องติดตั้งแอป ·
+                ใช้งานผ่านเบราว์เซอร์บนมือถือ
               </div>
             </>
           ) : (
@@ -470,7 +481,11 @@ function Login({
                     </label>
                     <label>
                       เลือกกลุ่มเรียน
-                      <div className="group-picker" role="group" aria-label="กลุ่มเรียน 1-5">
+                      <div
+                        className="group-picker"
+                        role="group"
+                        aria-label="กลุ่มเรียน 1-5"
+                      >
                         {[1, 2, 3, 4, 5].map((n) => (
                           <button
                             type="button"
@@ -588,6 +603,7 @@ function Login({
 }
 
 function InstructorApp({ onLogout }: { onLogout: () => void }) {
+  const [extensionStudent, setExtensionStudent] = useState<string | null>(null);
   const [data, setData] = useState<Overview | null>(null),
     [error, setError] = useState(""),
     [tab, setTab] = useState("overview"),
@@ -834,7 +850,9 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
           )}
           <div className="metrics-grid">
             <Metric
-              label={group === "all" ? "นักเรียนทั้งห้อง" : `นักเรียนกลุ่ม ${group}`}
+              label={
+                group === "all" ? "นักเรียนทั้งห้อง" : `นักเรียนกลุ่ม ${group}`
+              }
               value={registered}
               icon={Users}
               note={
@@ -873,8 +891,8 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                   <div>
                     <h3>ความคืบหน้าแต่ละภารกิจ</h3>
                     <p className="muted">
-                      ส่งแล้ว / นักเรียน {registered} คน · ถูกต้อง = คะแนนตรวจรวมของ
-                      AI ตั้งแต่ 5 ขึ้นไป
+                      ส่งแล้ว / นักเรียน {registered} คน · ถูกต้อง =
+                      คะแนนตรวจรวมของ AI ตั้งแต่ 5 ขึ้นไป
                     </p>
                   </div>
                   <BookOpen size={20} />
@@ -1000,6 +1018,56 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
               </section>
             </div>
           )}
+          {extensionStudent && (
+            <InstructorExtension
+              studentId={extensionStudent}
+              onClose={() => setExtensionStudent(null)}
+            />
+          )}
+          <section className="surface extension-panel">
+            <h3>ภารกิจต่อยอด · กลุ่ม {group === "all" ? "ทั้งหมด" : group}</h3>
+            <p>
+              ปลดล็อก {finished}/{registered} คน · A เริ่มแล้ว{" "}
+              {
+                data.extensionWork.filter(
+                  (w) =>
+                    w.mission === 1 &&
+                    groupStudents.some((p) => p.id === w.student_id),
+                ).length
+              }{" "}
+              / ส่งแล้ว{" "}
+              {
+                data.extensionWork.filter(
+                  (w) =>
+                    w.mission === 1 &&
+                    w.status === "submitted" &&
+                    groupStudents.some((p) => p.id === w.student_id),
+                ).length
+              }{" "}
+              คน · B เริ่มแล้ว{" "}
+              {
+                data.extensionWork.filter(
+                  (w) =>
+                    w.mission === 2 &&
+                    groupStudents.some((p) => p.id === w.student_id),
+                ).length
+              }{" "}
+              / ส่งแล้ว{" "}
+              {
+                data.extensionWork.filter(
+                  (w) =>
+                    w.mission === 2 &&
+                    w.status === "submitted" &&
+                    groupStudents.some((p) => p.id === w.student_id),
+                ).length
+              }{" "}
+              คน
+            </p>
+            <small>
+              เริ่มแล้วนับรวมผู้ส่งแล้ว · คลิกสถานะ A/B
+              ในตารางเพื่อดูร่างและภาพนำเสนอ
+            </small>
+          </section>
           {help.length > 0 && (
             <section className="help-strip">
               <Hand size={20} />
@@ -1109,6 +1177,8 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                           0{l.id}
                         </th>
                       ))}
+                      <th>ต่อยอด A</th>
+                      <th>ต่อยอด B</th>
                       <th>ส่งงาน</th>
                       <th>เสร็จเมื่อ</th>
                       <th>คะแนน</th>
@@ -1174,6 +1244,27 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                                   onClick={() => setSelected(s.id)}
                                 >
                                   {sub ? <Check size={14} /> : <span>—</span>}
+                                </button>
+                              </td>
+                            );
+                          })}
+                          {[1, 2].map((m) => {
+                            const row = data.extensionWork.find(
+                              (w) => w.student_id === s.id && w.mission === m,
+                            );
+                            return (
+                              <td key={`extension-${m}`}>
+                                <button
+                                  className="btn secondary"
+                                  onClick={() => setExtensionStudent(s.id)}
+                                >
+                                  {row?.status === "submitted"
+                                    ? "ส่งแล้ว"
+                                    : row
+                                      ? "เริ่มแล้ว"
+                                      : done
+                                        ? "พร้อมเริ่ม"
+                                        : "ยังล็อก"}
                                 </button>
                               </td>
                             );
