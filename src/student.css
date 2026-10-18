@@ -1886,3 +1886,14 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* ---- Roster finish time + score ---- */
+.roster-table .finish-time {
+  font-size: 11px;
+  color: #7d6752;
+  white-space: nowrap;
+}
+.roster-score {
+  color: #67432d;
+  white-space: nowrap;
+}

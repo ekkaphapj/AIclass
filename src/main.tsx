@@ -84,6 +84,14 @@ const thaiTime = (n: number) =>
     minute: "2-digit",
     timeZone: "Asia/Bangkok",
   });
+const thaiDateTime = (n: number) =>
+  new Date(n).toLocaleString("th-TH", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  });
 const statusLabels: Record<string, string> = {
   submitted: "ส่งแล้ว",
   reviewed: "ตรวจแล้ว",
@@ -586,6 +594,7 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("all"),
     [group, setGroup] = useState("all"),
+    [sort, setSort] = useState("number"),
     [selected, setSelected] = useState<string | null>(null),
     [showSettings, setShowSettings] = useState(false),
     [showQr, setShowQr] = useState(false),
@@ -652,6 +661,25 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
       aiScores.set(fr.student_id, m);
     } catch {}
   }
+  const finishedAt = (sid: string) => {
+    const rows = studentSubs(sid).filter(
+      (s) => !lessons.find((l) => l.id === s.lesson)?.optional,
+    );
+    if (!requiredLessons.every((l) => rows.some((s) => s.lesson === l.id)))
+      return null;
+    return Math.max(...rows.map((s) => s.updated_at));
+  };
+  const avgScore = (sid: string) => {
+    const vals = requiredLessons.map((l) => {
+      const manual = studentSubs(sid).find((s) => s.lesson === l.id)?.score;
+      if (manual != null) return manual;
+      return aiScores.get(sid)?.get(l.id) ?? null;
+    });
+    const got = vals.filter((v): v is number => v != null);
+    return got.length
+      ? Math.round((got.reduce((a, b) => a + b, 0) / got.length) * 10) / 10
+      : null;
+  };
   const people = groupStudents.filter(
     (s) =>
       `${s.number} ${s.name} ${s.squad}`
@@ -668,6 +696,18 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
             studentSubs(s.id).some((x) => x.lesson === l.id),
           ))),
   );
+  const sortedPeople = [...people].sort((a, b) => {
+    if (sort === "finish-desc")
+      return (finishedAt(b.id) ?? 0) - (finishedAt(a.id) ?? 0);
+    if (sort === "finish-asc") {
+      const fa = finishedAt(a.id) ?? Infinity,
+        fb = finishedAt(b.id) ?? Infinity;
+      return fa - fb;
+    }
+    if (sort === "score-desc")
+      return (avgScore(b.id) ?? -1) - (avgScore(a.id) ?? -1);
+    return 0;
+  });
   const updateSettings = async (patch: Partial<Settings>) => {
     try {
       await api("/admin/settings", { ...data.settings, ...patch });
@@ -1045,6 +1085,16 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                     <option value="complete">ส่งครบแล้ว</option>
                     <option value="help">ขอความช่วยเหลือ</option>
                   </select>
+                  <select
+                    aria-label="เรียงลำดับรายชื่อ"
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                  >
+                    <option value="number">เรียงตามเลขที่</option>
+                    <option value="finish-desc">เสร็จล่าสุดก่อน</option>
+                    <option value="finish-asc">เสร็จก่อนแรก</option>
+                    <option value="score-desc">คะแนนสูงไปต่ำ</option>
+                  </select>
                 </div>
               </div>
               <div className="table-scroll">
@@ -1060,13 +1110,17 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                         </th>
                       ))}
                       <th>ส่งงาน</th>
+                      <th>เสร็จเมื่อ</th>
+                      <th>คะแนน</th>
                       <th>ก่อน / หลัง</th>
                       <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {people.map((s) => {
+                    {sortedPeople.map((s) => {
                       const work = studentSubs(s.id),
+                        done = finishedAt(s.id),
+                        score = avgScore(s.id),
                         isOnline = s.last_seen > data.serverTime - 90000,
                         pre = quizzes.find(
                           (q) => q.student_id === s.id && q.kind === "pre",
@@ -1135,6 +1189,22 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                               }
                               <span className="muted"> / 7</span>
                             </b>
+                          </td>
+                          <td>
+                            {done ? (
+                              <small className="finish-time">
+                                {thaiDateTime(done)}
+                              </small>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
+                          <td>
+                            {score != null ? (
+                              <b className="roster-score">{score}/10</b>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
                           </td>
                           <td>
                             {pre ? `${pre.score}/5` : "—"}{" "}

@@ -447,6 +447,7 @@ function Exercise({
   const dirty = useRef(false),
     fieldsRef = useRef(fields),
     timer = useRef<ReturnType<typeof setTimeout> | null>(null),
+    advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
     saveSequence = useRef<Promise<unknown>>(Promise.resolve());
   fieldsRef.current = fields;
   const previous = me.submissions.find((s) => s.lesson === l.id),
@@ -519,6 +520,12 @@ function Exercise({
       setCopyState("คัดลอกไม่ได้ ลองแตะค้างที่ข้อความเพื่อคัดลอก");
     }
   }
+  useEffect(
+    () => () => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    },
+    [],
+  );
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const wasComplete = requiredLessons.every((r) =>
@@ -527,6 +534,7 @@ function Exercise({
     setBusy(true);
     setError("");
     if (timer.current) clearTimeout(timer.current);
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
     try {
       await saveSequence.current.catch(() => {});
       await api("/submission", {
@@ -538,15 +546,27 @@ function Exercise({
       dirty.current = false;
       localStorage.removeItem(key);
       setDraftState("");
-      setSuccess("ส่งคำตอบแล้ว กลับมาแก้ไขและส่งใหม่ได้");
-      await refresh();
-      if (
+      const completesAll =
         !wasComplete &&
         requiredLessons.every(
-          (r) => r.id === l.id || me.submissions.some((s) => s.lesson === r.id),
-        )
-      )
-        onCompletedAll?.();
+          (r) =>
+            r.id === l.id || me.submissions.some((s) => s.lesson === r.id),
+        );
+      // ข้อ 6 ไม่เลื่อนอัตโนมัติ เพื่อให้ใช้แชตวิเคราะห์ต่อหลังส่งคำตอบได้
+      const advancing =
+        !completesAll && l.id < lessons.length && l.id !== 6;
+      setSuccess(
+        advancing
+          ? "ส่งคำตอบแล้ว — กำลังไปข้อถัดไป"
+          : "ส่งคำตอบแล้ว กลับมาแก้ไขและส่งใหม่ได้",
+      );
+      await refresh();
+      if (completesAll) onCompletedAll?.();
+      else if (advancing)
+        advanceTimer.current = setTimeout(() => {
+          advanceTimer.current = null;
+          onNavigate(l.id + 1);
+        }, 1400);
     } catch (e) {
       setError(message(e));
     } finally {

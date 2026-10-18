@@ -907,7 +907,12 @@ async function api(req: Request, env: Cloudflare.Env) {
           .map(([k, v]) => `ช่วง ${k} มี ${v} เหตุ`)
           .join(", ") +
         `; ลักทรัพย์ช่วง 18:00–23:59 มี ${ref.theftEvening} เหตุ โดยหนองแสง ${ref.theftNongSaengEvening} เหตุ; ปล้นบ้านใหม่ช่วง 18:00–23:59 มี ${ref.robberyBanMaiEvening} เหตุ; ข้อ 6.5 เป็นแผนปลายเปิด ดูความสอดคล้องกับข้อมูลและการระบุข้อจำกัดของข้อมูล`;
-      const parts = subs.map((s) => {
+      const parts = subs
+        .filter(
+          (s) =>
+            lessons.find((x) => x.id === s.lesson)?.answerType !== "link",
+        )
+        .map((s) => {
         const info = lessons.find((l) => l.id === s.lesson)!;
         return (
           `### ข้อ ${s.lesson} — ${info.title}${info.optional ? " (ข้อไม่บังคับ)" : ""}\n` +
@@ -935,7 +940,7 @@ async function api(req: Request, env: Cloudflare.Env) {
               {
                 role: "system",
                 content:
-                  "คุณเป็นผู้ช่วยตรวจงานในชั้นเรียน AI สำหรับนักเรียนนายสิบตำรวจ ข้อมูลทั้งหมดเป็นสถานการณ์สมมติ หน้าที่คือให้คะแนนคำตอบของผู้เรียนทีละข้อเป็นเลข 0 ถึง 10 โดยดูว่าตรงคำถาม ถูกต้อง ครบถ้วน และแยกข้อเท็จจริงจากข้อสันนิษฐานหรือระบุข้อจำกัดได้ ข้อ 6 ให้เทียบตัวเลขกับเฉลยอ้างอิงที่แนบให้ ข้อที่ส่งลิงก์ผลงาน ให้พิจารณาจากผลตรวจลิงก์ของระบบเท่านั้น ห้ามอ้างว่าเห็นเนื้อหาในลิงก์ ห้ามวินิจฉัยความผิดของบุคคล ความเห็นต่อข้อยาวไม่เกิน 80 ตัวอักษร ตอบกลับเป็น JSON เท่านั้น ตามรูปแบบ {\"lessons\":[{\"lesson\":เลขข้อ,\"score\":คะแนน 0-10,\"comment\":\"เหตุผลสั้น\"}],\"summary\":\"สรุปภาพรวม 2-3 ประโยค\"} ห้ามเขียนข้อความอื่นนอกจาก JSON",
+                  "คุณเป็นผู้ช่วยตรวจงานในชั้นเรียน AI สำหรับนักเรียนนายสิบตำรวจ ข้อมูลทั้งหมดเป็นสถานการณ์สมมติ หน้าที่คือให้คะแนนคำตอบข้อเขียนแต่ละข้อแบบไม่ต้องละเอียด ใช้เกณฑ์นี้: ถ้าคำตอบถูกต้องและครบถ้วนตามโจทย์ ให้ 7 คะแนน แล้วเพิ่มได้อีกสูงสุด 3 คะแนนจากความละเอียด ตัวอย่าง ความชัดเจน และการระบุข้อจำกัดของข้อมูล (รวมสูงสุด 10) ถ้าคำตอบผิด ตกหล่น หรือไม่ตรงคำถาม ให้ 0–6 ตามความผิดพลาด ข้อ 6 เทียบตัวเลขกับเฉลยอ้างอิงที่แนบให้ ตัวเลขครบและถูกต้องถือว่าครบถ้วน ห้ามวินิจฉัยความผิดของบุคคล ความเห็นต่อข้อยาวไม่เกิน 80 ตัวอักษร ตอบกลับเป็น JSON เท่านั้น ตามรูปแบบ {\"lessons\":[{\"lesson\":เลขข้อ,\"score\":คะแนน 0-10,\"comment\":\"เหตุผลสั้น\"}],\"summary\":\"สรุปภาพรวม 2-3 ประโยค\"} ห้ามเขียนข้อความอื่นนอกจาก JSON",
               },
               {
                 role: "user",
@@ -968,9 +973,12 @@ async function api(req: Request, env: Cloudflare.Env) {
           completion_tokens?: number;
         };
       };
+      const gradedIds = lessons
+        .filter((l) => !l.optional && l.answerType !== "link")
+        .map((l) => l.id);
       const graded = parseGrading(
         data.choices?.[0]?.message?.content || "",
-        requiredIds,
+        gradedIds,
       );
       if (!graded)
         throw new HttpError(
@@ -986,21 +994,37 @@ async function api(req: Request, env: Cloudflare.Env) {
         typeof reported === "number" && reported >= 0
           ? reported
           : computed || reserve;
+      const linkRows = subs
+        .filter(
+          (s) => lessons.find((x) => x.id === s.lesson)?.answerType === "link",
+        )
+        .map((s) => {
+          const k = checks.find((x) => x.lesson === s.lesson),
+            state = !k || !k.status ? "uncertain" : k.status < 400 ? "ok" : "broken";
+          return {
+            lesson: s.lesson,
+            score: state === "ok" ? 10 : state === "broken" ? 0 : 7,
+            comment:
+              state === "ok"
+                ? "ลิงก์เปิดได้ — ได้คะแนนเต็ม"
+                : state === "broken"
+                  ? `ลิงก์เปิดไม่ได้ (HTTP ${k?.status || 0})`
+                  : "ระบบตรวจลิงก์ไม่สำเร็จชั่วคราว ให้ 7 คะแนน ผู้สอนอาจตรวจซ้ำ",
+            linkStatus: linkText(s.lesson),
+          };
+        });
+      const allRows = [
+        ...graded.lessons.filter((l) => subs.some((s) => s.lesson === l.lesson)),
+        ...linkRows,
+      ].sort((a, b) => a.lesson - b.lesson);
       const scores = requiredIds.map(
-        (rid) => graded.lessons.find((l) => l.lesson === rid)!.score,
+        (rid) => allRows.find((l) => l.lesson === rid)!.score,
       );
       const average =
         Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) /
         10;
       const stored = {
-        lessons: graded.lessons
-          .filter((l) => subs.some((s) => s.lesson === l.lesson))
-          .map((l) => ({
-            ...l,
-            linkStatus: checks.some((k) => k.lesson === l.lesson)
-              ? linkText(l.lesson)
-              : undefined,
-          })),
+        lessons: allRows,
         average,
         summary: graded.summary,
         checkedAt: now(),

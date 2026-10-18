@@ -378,9 +378,11 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
     );
   await page.getByRole("button", { name: "ส่งคำตอบ", exact: true }).click();
   await expect(
-    page.getByText("ส่งคำตอบแล้ว กลับมาแก้ไขและส่งใหม่ได้"),
+    page.getByText("ส่งคำตอบแล้ว — กำลังไปข้อถัดไป"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "ข้อถัดไป", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "ถามเรื่องกฎหมาย", exact: true }),
+  ).toBeVisible({ timeout: 6000 });
   await page
     .getByLabel("คำตอบ", { exact: true })
     .fill("คำตอบกฎหมายฉบับร่าง ต้องตรวจแหล่งอ้างอิงกับผู้สอนก่อนใช้");
@@ -398,7 +400,9 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
   );
   await page.getByRole("button", { name: "ส่งคำตอบ", exact: true }).click();
   await expect(page.locator(".form-success")).toBeVisible();
-  await page.locator(".exercise-steps button").nth(2).click();
+  await expect(
+    page.getByRole("heading", { name: "แปลคำแจ้งความ", exact: true }),
+  ).toBeVisible({ timeout: 6000 });
   await page
     .getByLabel("คำตอบ", { exact: true })
     .fill(
@@ -406,7 +410,9 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
     );
   await page.getByRole("button", { name: "ส่งคำตอบ", exact: true }).click();
   await expect(page.locator(".form-success")).toBeVisible();
-  await page.getByRole("button", { name: "ข้อถัดไป", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "อ่านตัวหนังสือจากภาพ", exact: true }),
+  ).toBeVisible({ timeout: 6000 });
   const download = page.waitForEvent("download");
   await page.getByRole("link", { name: "บันทึกรูปไปใช้" }).click();
   expect((await download).suggestedFilename()).toContain(".png");
@@ -428,7 +434,9 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
     path: "test-results/v2-student-document.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "ข้อถัดไป", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "อธิบายสิ่งที่เห็นในภาพ", exact: true }),
+  ).toBeVisible({ timeout: 6000 });
   await expect
     .poll(async () =>
       page
@@ -443,7 +451,9 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
     );
   await page.getByRole("button", { name: "ส่งคำตอบ", exact: true }).click();
   await expect(page.locator(".form-success")).toBeVisible();
-  await page.getByRole("button", { name: "ข้อถัดไป", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "ลองวิเคราะห์ข้อมูลเหตุ", exact: true }),
+  ).toBeVisible({ timeout: 6000 });
   expect(await page.locator(".incident-table tbody tr").count()).toBe(18);
   for (let i = 0; i < 5; i++)
     await page
@@ -557,6 +567,16 @@ test("desktop: eight monitor columns, 7 required, separate subanswers, review an
     page.locator(".student-name").filter({ hasText: uiName }),
   ).toHaveCount(0);
   await page.getByLabel("เลือกกลุ่มเรียน", { exact: true }).selectOption("all");
+  await page.getByText("เสร็จเมื่อ", { exact: true }).waitFor();
+  await page
+    .getByLabel("เรียงลำดับรายชื่อ", { exact: true })
+    .selectOption("finish-desc");
+  await expect(page.locator(".roster-table tbody tr").first()).toContainText(
+    uiName,
+  );
+  await page
+    .getByLabel("เรียงลำดับรายชื่อ", { exact: true })
+    .selectOption("number");
   await page.getByLabel("ค้นหานักเรียน", { exact: true }).fill(uiNumber);
   await page.locator(".student-name").filter({ hasText: uiName }).click();
   await expect(page.locator(".detail-person")).toContainText("/7 ข้อหลัก");
