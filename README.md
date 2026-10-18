@@ -74,3 +74,5 @@ npx playwright test tests/extensions.spec.ts tests/classroom-v2.spec.ts --grep "
 ```
 
 The legacy budget test requires a nonempty local API key value to reach admission checks; an explicitly fake local test placeholder suffices for this filtered command. Do not run live AI tests with a placeholder or upload local test secrets.
+
+Extension revision: mission A is now a fictional violent robbery with an injured shopkeeper (no graphic images), synchronized system timestamps and a shorter evidence set. Both missions require a learner-authored prompt (minimum 20 characters on final submission, migration 0005). Copy/download contains case data only; collapsible examples provide incomplete scaffolds. Instructor review displays the submitted prompt; older submissions remain readable. The clock template labels time bands without giving calculated totals.

@@ -6,6 +6,7 @@ type Data = { unlocked: boolean; content: string[]; work: ExtensionWork[] };
 export function Extensions({ studentId }: { studentId: string }) {
   const [data, setData] = useState<Data>();
   const [active, setActive] = useState(0);
+  const [prompt, setPrompt] = useState("");
   const [findings, setFindings] = useState(""),
     [plan, setPlan] = useState(""),
     [link, setLink] = useState("");
@@ -30,6 +31,7 @@ export function Extensions({ studentId }: { studentId: string }) {
         row = (await refresh()).work.find((w) => w.mission === n);
       }
       let values = {
+        prompt: row?.prompt || "",
         findings: row?.findings || "",
         plan: row?.plan || "",
         link: row?.link || "",
@@ -38,6 +40,7 @@ export function Extensions({ studentId }: { studentId: string }) {
         const draft = JSON.parse(localStorage.getItem(key(n)) || "null");
         if (draft && draft.updated_at > (row?.updated_at || 0)) values = draft;
       } catch {}
+      setPrompt(values.prompt || "");
       setFindings(values.findings);
       setPlan(values.plan);
       setLink(values.link);
@@ -50,12 +53,14 @@ export function Extensions({ studentId }: { studentId: string }) {
   };
   const update = (field: string, value: string) => {
     const values = {
+      prompt,
       findings,
       plan,
       link,
       [field]: value,
       updated_at: Date.now(),
     };
+    if (field === "prompt") setPrompt(value);
     if (field === "findings") setFindings(value);
     if (field === "plan") setPlan(value);
     if (field === "link") setLink(value);
@@ -72,6 +77,7 @@ export function Extensions({ studentId }: { studentId: string }) {
       await api("/extensions", {
         mission: active,
         status: submit ? "submitted" : "started",
+        prompt,
         findings,
         plan,
         link,
@@ -88,7 +94,9 @@ export function Extensions({ studentId }: { studentId: string }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(data!.content[active - 1]);
-      setNotice("คัดลอกข้อมูลและคำสั่งแล้ว");
+      setNotice(
+        "คัดลอกเฉพาะชุดข้อมูลแล้ว — เขียน prompt ของคุณเพิ่มก่อนส่งให้ AI",
+      );
     } catch {
       setNotice("คัดลอกไม่ได้ เลือกข้อความในชุดข้อมูลด้านล่างได้");
     }
@@ -137,7 +145,7 @@ export function Extensions({ studentId }: { studentId: string }) {
         cy = 330,
         r = 175;
       const colors = ["#c3b79c", "#af9e79", "#927c51", "#72592f"];
-      [13, 14, 16, 25].forEach((v, i) => {
+      [0, 1, 2, 3].forEach((i) => {
         const a = -Math.PI / 2 + (i * Math.PI) / 2;
         c.beginPath();
         c.moveTo(cx, cy);
@@ -147,14 +155,14 @@ export function Extensions({ studentId }: { studentId: string }) {
         c.fill();
         c.fillStyle = "#fff";
         c.fillText(
-          `${i * 6}–${(i + 1) * 6}: ${v}`,
+          `${i * 6}–${(i + 1) * 6} น.`,
           cx + 100 * Math.cos(a + Math.PI / 4) - 48,
           cy + 100 * Math.sin(a + Math.PI / 4),
         );
       });
       y = 560;
       c.fillStyle = "#463923";
-      lines("นาฬิกา 24 ชั่วโมง / รวมยอดรับแจ้ง 28 วัน 68 เหตุ");
+      lines("นาฬิกา 24 ชั่วโมง / ใช้ข้อค้นพบด้านล่างระบุจำนวนเหตุ");
     }
     if (active === 1) {
       const events = findings
@@ -233,12 +241,12 @@ export function Extensions({ studentId }: { studentId: string }) {
             <div className="stack">
               <h3>{extensionTitles[active - 1]}</h3>
               <p>
-                อ่าน 2 นาที → วิเคราะห์ 4 → ตรวจ 3 → ทำภาพ 3 นาที ใช้ AI
-                ภายนอกที่เคยใช้ได้เลย
+                อ่าน 2 นาที → เขียน prompt 2 → วิเคราะห์และตรวจ 4 → ทำภาพ 4 นาที
+                ใช้ AI ภายนอกที่เคยใช้ได้เลย
               </p>
               <div className="extension-actions">
                 <button className="btn" onClick={() => void copy()}>
-                  คัดลอกโจทย์พร้อมข้อมูล
+                  คัดลอกเฉพาะชุดข้อมูล
                 </button>
                 <button className="btn secondary" onClick={downloadText}>
                   ดาวน์โหลดข้อมูล .txt
@@ -260,9 +268,48 @@ export function Extensions({ studentId }: { studentId: string }) {
                 />
               )}
               <details>
-                <summary>อ่านชุดข้อมูลและคำสั่ง AI</summary>
+                <summary>อ่านชุดข้อมูลคดี</summary>
                 <pre className="extension-data">{data.content[active - 1]}</pre>
               </details>
+              <section className="surface extension-panel">
+                <h4>ภารกิจของคุณ</h4>
+                <p>
+                  {active === 1
+                    ? "เชื่อมโยงพยาน CDR และทะเบียนรถ: ทำ timeline 4–6 จุด เลือกแนวตรวจสอบแรกพร้อมหลักฐาน 2 รหัส และบอกข้อจำกัดหรือสมมติฐานทางเลือก 1 ข้อ"
+                    : "หาข้อค้นพบประเภท–พื้นที่–เวลา 3 ข้อ ทำนาฬิกาแบบ 4 ช่วงเวลา และเสนอแผนสายตรวจ แผนเผชิญเหตุ และประชาสัมพันธ์อย่างละสั้น ๆ โดยคงรถพร้อมรับเหตุ 1 ชุด"}
+                </p>
+                <p>
+                  เขียน prompt ของตัวเอง 2–4 ประโยค: ให้ AI ทำอะไร •
+                  ใช้ข้อมูลไหน • ตอบรูปแบบใด • ต้องระวังอะไร
+                  แล้วตรวจคำตอบกับข้อมูลจริงในใบงาน ถ้าคำตอบคลาดเคลื่อน
+                  ให้ถามแก้อย่างน้อยหนึ่งจุดที่จำเป็น
+                </p>
+                <details>
+                  <summary>ดูตัวอย่างสั้น ๆ เพื่อประยุกต์</summary>
+                  <p>
+                    {active === 1
+                      ? "ตัวอย่างเฉพาะส่วน: ช่วยเรียงเหตุการณ์จาก [ระบุแหล่งข้อมูล] เป็น [รูปแบบที่เลือก] โดย [ข้อจำกัดที่คุณกำหนด]"
+                      : "ตัวอย่างเฉพาะส่วน: เปรียบเทียบ [ประเภทเหตุ] ใน [พื้นที่/ช่วงเวลา] แล้วเสนอ [งานที่ต้องการ] ภายใต้ [ทรัพยากรที่กำหนด]"}
+                  </p>
+                  <p>
+                    เติมเป้าหมาย แหล่งข้อมูล รูปแบบคำตอบ และข้อจำกัดด้วยตนเอง
+                    ตัวอย่างนี้ยังไม่ครอบคลุมงานทั้งหมด สำหรับภาพ
+                    ให้คิดต่อว่าจะนำเสนออะไร ใช้ตัวเลข/หลักฐานใด
+                    และทำอย่างไรให้อ่านง่ายในมือถือ
+                  </p>
+                </details>
+              </section>
+              <label>
+                Prompt ที่คุณเขียนและใช้จริง
+                <textarea
+                  rows={4}
+                  maxLength={6000}
+                  disabled={busy}
+                  value={prompt}
+                  placeholder="เขียนด้วยคำของคุณเอง ไม่ต้องใช้ศัพท์เทคนิค (อย่างน้อย 20 ตัวอักษร)"
+                  onChange={(e) => update("prompt", e.target.value)}
+                />
+              </label>
               <label>
                 ข้อค้นพบ{" "}
                 {active === 1
@@ -377,6 +424,11 @@ export function InstructorExtension({
               timeZone: "Asia/Bangkok",
             })}
           </p>
+          <h4>Prompt ของผู้เรียน</h4>
+          <p style={{ whiteSpace: "pre-wrap" }}>
+            {w.prompt || "งานเดิมก่อนเพิ่มช่อง prompt"}
+          </p>
+          <h4>ข้อค้นพบ</h4>
           <p style={{ whiteSpace: "pre-wrap" }}>{w.findings}</p>
           <p style={{ whiteSpace: "pre-wrap" }}>{w.plan}</p>
           {w.link && (

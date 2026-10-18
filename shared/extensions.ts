@@ -2,6 +2,7 @@ export type ExtensionWork = {
   student_id: string;
   mission: number;
   status: "started" | "submitted";
+  prompt: string;
   findings: string;
   plan: string;
   link: string;
@@ -10,6 +11,6 @@ export type ExtensionWork = {
   submitted_at: number | null;
 };
 export const extensionTitles = [
-  "สืบคดีจำลองและทำ Timeline",
+  "สืบคดีจำลอง: ชิงทรัพย์และทำร้ายเจ้าของร้าน",
   "นาฬิกาอาชญากรรมและแผนชุมชน",
 ];

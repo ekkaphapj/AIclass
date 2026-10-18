@@ -279,23 +279,24 @@ async function api(req: Request, env: Cloudflare.Env) {
       mission = Number(b.mission);
     if (![1, 2].includes(mission)) throw new HttpError(400, "ไม่พบภารกิจ");
     const status = b.status === "submitted" ? "submitted" : "started";
-    const findings = str(b.findings, 8000),
+    const prompt = str(b.prompt, 6000),
+      findings = str(b.findings, 8000),
       plan = str(b.plan, 8000),
       link = safeLink(b.link);
     if (
       status === "submitted" &&
-      (findings.length < 5 || plan.length < 5 || !link)
+      (prompt.length < 20 || findings.length < 5 || plan.length < 5 || !link)
     )
       throw new HttpError(
         400,
-        "กรอกข้อค้นพบ แผน/ข้อจำกัด และลิงก์ภาพ HTTPS ให้ครบ",
+        "เขียน prompt ของตนเองอย่างน้อย 20 ตัวอักษร พร้อมข้อค้นพบ แผน/ข้อจำกัด และลิงก์ภาพ HTTPS ให้ครบ",
       );
     const t = now();
     await env.DB.prepare(
-      `INSERT INTO extension_work(student_id,mission,status,findings,plan,link,started_at,updated_at,submitted_at)
-      VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(student_id,mission) DO UPDATE SET
+      `INSERT INTO extension_work(student_id,mission,status,findings,plan,link,started_at,updated_at,submitted_at,prompt)
+      VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(student_id,mission) DO UPDATE SET
       status=excluded.status,findings=excluded.findings,plan=excluded.plan,link=excluded.link,
-      updated_at=excluded.updated_at,submitted_at=excluded.submitted_at`,
+      updated_at=excluded.updated_at,submitted_at=excluded.submitted_at,prompt=excluded.prompt`,
     )
       .bind(
         id,
@@ -307,6 +308,7 @@ async function api(req: Request, env: Cloudflare.Env) {
         t,
         t,
         status === "submitted" ? t : null,
+        prompt,
       )
       .run();
     return json({ ok: true });

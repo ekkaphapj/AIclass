@@ -111,5 +111,33 @@
       "Presentation images submitted through HTTPS links, no direct image upload",
       "Extension scores are not integrated into original grading"
     ]
+  },
+  "extensionPromptRevision": {
+    "date": "2026-10-18",
+    "version": "642d30d6-8f30-4947-93a5-aa2d2d57388a",
+    "migration": "0005_extension_prompts.sql applied locally and remotely",
+    "typecheck": "passed",
+    "build": "passed with existing lucide-react warnings",
+    "focusedPlaywright": {
+      "passed": 3,
+      "seconds": 5.4,
+      "command": "npx playwright test tests/extensions.spec.ts tests/classroom-v2.spec.ts --grep \"extension gating|self-entered|returning login\"",
+      "coverage": [
+        "original registration and returning login",
+        "violent fictional robbery dataset, synchronized timestamps",
+        "case-data download excludes example prompts and teacher notes",
+        "both missions reject missing/short prompts on final submission",
+        "learner-authored prompt persists through save and reload",
+        "instructor can inspect submitted prompts",
+        "mobile width and PNG export"
+      ],
+      "limits": "No paid external AI calls or full AI integration suite; earlier local runs required preview restart after stale asset watcher and a local-only admin throttle counter reset."
+    },
+    "productionReadOnly": {
+      "health": 200,
+      "instructorPage": 200,
+      "sceneAsset": 200
+    },
+    "backwardCompatibility": "Old extension submissions remain readable with empty prompt; new submissions require prompt."
   }
 }

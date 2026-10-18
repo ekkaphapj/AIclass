@@ -52,6 +52,39 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     expect(unlocked.unlocked).toBe(true);
     expect(unlocked.content).toHaveLength(2);
     expect(unlocked.content.join("")).not.toContain("เฉลยสำหรับผู้สอน");
+    expect(unlocked.content[0]).toContain("แขนหัก");
+    expect(unlocked.content[0]).toContain("ชิงทรัพย์");
+    expect(unlocked.content.join("")).not.toContain("ตัวอย่างเฉพาะส่วน");
+    expect(unlocked.content.join("")).not.toContain("ช่วยเรียงเหตุการณ์");
+    for (const mission of [1, 2]) {
+      expect(
+        (
+          await api.post("/api/extensions", {
+            data: {
+              mission,
+              status: "submitted",
+              findings: "ข้อมูลครบแล้ว",
+              plan: "แผนตรวจสอบต่อ",
+              link: "https://example.com/image",
+            },
+          })
+        ).status(),
+      ).toBe(400);
+      expect(
+        (
+          await api.post("/api/extensions", {
+            data: {
+              mission,
+              status: "submitted",
+              prompt: "สั้น",
+              findings: "ข้อมูลครบแล้ว",
+              plan: "แผนตรวจสอบต่อ",
+              link: "https://example.com/image",
+            },
+          })
+        ).status(),
+      ).toBe(400);
+    }
     expect(
       (await api.post("/api/extensions", { data: { mission: 3 } })).status(),
     ).toBe(400);
@@ -71,9 +104,21 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     const page = await context.newPage();
     await page.goto("/");
     await page.getByRole("button", { name: /A · สืบคดีจำลอง/ }).click();
+    await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
+      "",
+    );
+    await page
+      .getByLabel("Prompt ที่คุณเขียนและใช้จริง")
+      .fill(
+        "ช่วยเรียงเหตุการณ์ W1 C1 L1 L2 เป็นตารางเวลาและรหัสหลักฐาน แยกข้อเท็จจริงจากข้อสันนิษฐาน ไม่ตัดสินว่าใครผิด",
+      );
+    const datasetDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "ดาวน์โหลดข้อมูล .txt" }).click();
+    const datasetPath = await (await datasetDownload).path();
+    expect(readFileSync(datasetPath!, "utf8")).toBe(unlocked.content[0]);
     await page
       .getByLabel("ข้อค้นพบ และลำดับเวลา พร้อมรหัสหลักฐาน")
-      .fill("19:50 L1 และ 20:05 L2 หลังแก้เวลาลบสองนาที");
+      .fill("19:50 L1 และ 20:05 L2 เวลาระบบตรงกันแล้ว");
     await page
       .getByLabel("สมมติฐานทางเลือก ข้อจำกัด และข้อมูลที่ต้องตรวจต่อ")
       .fill("อาจเป็นการส่งของตามปกติ ยังระบุตัวผู้กระทำไม่ได้");
@@ -89,6 +134,9 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     await expect(
       page.getByLabel("ข้อค้นพบ และลำดับเวลา พร้อมรหัสหลักฐาน"),
     ).toHaveValue(/19:50/);
+    await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
+      /ไม่ตัดสินว่าใครผิด/,
+    );
     const download = page.waitForEvent("download");
     await page
       .getByRole("button", { name: "ดาวน์โหลดภาพแม่แบบจากคำตอบ" })
@@ -107,15 +155,18 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
       path: "test-results/extensions-mobile.png",
       fullPage: true,
     });
-    await api.post("/api/extensions", {
+    const secondSubmit = await api.post("/api/extensions", {
       data: {
         mission: 2,
+        prompt:
+          "ช่วยหายอดตามประเภท พื้นที่ และเวลาในตาราง แล้วเสนอแผนโดยมีรถพร้อมรับเหตุหนึ่งชุดเสมอ ตอบสั้นพร้อมตัวเลข",
         status: "submitted",
         findings: "รวม 68 เหตุ เย็น 25",
         plan: "รถหนึ่งชุดพร้อมรับเหตุ อีกชุดตรวจพื้นที่",
         link: "https://example.com/clock",
       },
     });
+    expect(secondSubmit.ok()).toBe(true);
     const secret = JSON.parse(readFileSync(".secrets.json", "utf8"));
     expect(
       (
@@ -139,6 +190,9 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
       review.work.every((w: { status: string }) => w.status === "submitted"),
     ).toBe(true);
     expect(
+      review.work.find((w: { mission: number }) => w.mission === 1).prompt,
+    ).toContain("ไม่ตัดสินว่าใครผิด");
+    expect(
       (
         await outsider.request.get(`/api/admin/extensions/${student.id}`)
       ).status(),
@@ -160,6 +214,9 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     await expect(
       dashboard.getByRole("link", { name: "เปิดภาพนำเสนอ" }),
     ).toHaveCount(2);
+    await expect(dashboard.getByRole("dialog")).toContainText(
+      "ไม่ตัดสินว่าใครผิด",
+    );
     await dashboard.screenshot({
       path: "test-results/extensions-instructor.png",
       fullPage: true,

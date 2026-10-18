@@ -1,0 +1,1 @@
+ALTER TABLE extension_work ADD COLUMN prompt TEXT NOT NULL DEFAULT '';
