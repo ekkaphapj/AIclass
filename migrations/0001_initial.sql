@@ -1,0 +1,15 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE settings (id INTEGER PRIMARY KEY CHECK(id=1), title TEXT NOT NULL DEFAULT 'AI Police Lab · รุ่น P4', expected INTEGER NOT NULL DEFAULT 150, active_lesson INTEGER NOT NULL DEFAULT 1, lock_following INTEGER NOT NULL DEFAULT 0, admission_open INTEGER NOT NULL DEFAULT 1, ai_paused INTEGER NOT NULL DEFAULT 0, budget REAL NOT NULL DEFAULT 3, max_requests INTEGER NOT NULL DEFAULT 1800);
+INSERT INTO settings(id) VALUES(1);
+CREATE TABLE students(id TEXT PRIMARY KEY, number TEXT NOT NULL UNIQUE, name TEXT NOT NULL, squad TEXT NOT NULL, recovery_hash TEXT NOT NULL, created_at INTEGER NOT NULL, last_seen INTEGER NOT NULL, current_lesson INTEGER NOT NULL DEFAULT 0, help TEXT NOT NULL DEFAULT '');
+CREATE TABLE sessions(token_hash TEXT PRIMARY KEY, student_id TEXT REFERENCES students(id) ON DELETE CASCADE, role TEXT NOT NULL, expires_at INTEGER NOT NULL);
+CREATE INDEX sessions_expiry ON sessions(expires_at);
+CREATE TABLE submissions(id TEXT PRIMARY KEY, student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE, lesson INTEGER NOT NULL, prompt TEXT NOT NULL, result TEXT NOT NULL, reflection TEXT NOT NULL, tool TEXT NOT NULL, link TEXT NOT NULL DEFAULT '', media_state TEXT NOT NULL DEFAULT 'complete', status TEXT NOT NULL DEFAULT 'submitted', score INTEGER, feedback TEXT NOT NULL DEFAULT '', submitted_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(student_id,lesson));
+CREATE INDEX submissions_student ON submissions(student_id);
+CREATE TABLE attachments(submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE, image TEXT NOT NULL);
+CREATE TABLE drafts(student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE, lesson INTEGER NOT NULL, body TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(student_id,lesson));
+CREATE TABLE quizzes(student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE, kind TEXT NOT NULL, answers TEXT NOT NULL, score INTEGER NOT NULL, submitted_at INTEGER NOT NULL, PRIMARY KEY(student_id,kind));
+CREATE TABLE ai_jobs(id TEXT PRIMARY KEY, student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE, lesson INTEGER NOT NULL, status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '', cost REAL NOT NULL DEFAULT 0, reserved REAL NOT NULL DEFAULT 0.001, created_at INTEGER NOT NULL, finished_at INTEGER);
+CREATE INDEX ai_jobs_status ON ai_jobs(status,created_at);
+CREATE INDEX ai_jobs_student ON ai_jobs(student_id,status);
+CREATE TABLE login_attempts(key TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 1, window_start INTEGER NOT NULL);

@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-18",
+  "project": "ai-class-p4",
+  "url": "https://ai-class-p4.ekapap-j.workers.dev",
+  "build": "passed",
+  "typescript": "passed",
+  "playwright": {
+    "tests": 5,
+    "passed": 5,
+    "lastRunSeconds": 16.8,
+    "browser": "Chromium",
+    "mobileViewport": "390x844",
+    "desktopViewport": "1440x1000",
+    "coverage": [
+      "self-selected four-digit PIN including leading zeros",
+      "eight exercise pages, previous/next and editable drafts",
+      "external AI copy/paste submissions",
+      "OCR document and object image downloads",
+      "five separate analysis answers",
+      "live contextual OpenRouter chat and idempotency",
+      "optional music skipped with 7/7 required completion",
+      "instructor review, eight monitor columns and private projection",
+      "budget, lesson locks, CSRF, session and ownership checks"
+    ]
+  },
+  "localLoad": {
+    "virtualUsers": 150,
+    "concurrentRegistrationBurst": 150,
+    "successfulUsers": 150,
+    "failedUsers": 0,
+    "requests": 752,
+    "seconds": 9.52,
+    "p50Ms": 2650,
+    "p95Ms": 5528,
+    "aiRequests": 0,
+    "limitation": "Local Workers + D1 simulation only. Does not establish production capacity, venue Wi-Fi capacity, or 150 concurrent AI inferences. Historical test from the six-mission version; not rerun for course v2.",
+    "courseVersion": 1
+  },
+  "productionSmoke": {
+    "version": 2,
+    "url": "https://ai-class-p4.ekapap-j.workers.dev",
+    "checks": [
+      "fixed-instructor-password",
+      "four-digit-class-code-and-self-pin",
+      "single-page-external-answer",
+      "ocr-and-object-image-assets",
+      "live-context-chat-and-five-answers",
+      "optional-music-and-infographic-link",
+      "instructor-review-and-private-projection"
+    ],
+    "errors": [],
+    "initialStudents": 1,
+    "ok": true,
+    "fixtureRemoved": true
+  },
+  "secretAudit": "OpenRouter API key and instructor password absent from public JS/CSS. Four-digit class-code substrings are excluded from byte-string scanning to avoid matching library digit alphabets.",
+  "courseVersion": 2,
+  "requiredExercises": 7,
+  "totalExercises": 8,
+  "optionalExercises": [
+    7
+  ],
+  "deploymentVersion": "be2ca6ed-e24c-4498-8221-c55fde7ef81b"
+}

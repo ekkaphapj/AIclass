@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-class-p4",
+  "workers_dev": true,
+  "preview_urls": false,
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ai-class-p4",
+      "database_id": "c5661da8-1e71-4a56-89fb-52896ba0516c",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    "AI_MODEL": "z-ai/glm-5.3-flash",
+    "AI_INPUT_PRICE": "0.048",
+    "AI_OUTPUT_PRICE": "0.20",
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+}

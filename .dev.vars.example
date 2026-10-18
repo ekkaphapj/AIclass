@@ -1,0 +1,5 @@
+# Local development only. Copy to .dev.vars and fill in your own values.
+# Keep ADMIN_PASSWORD and CLASS_CODE consistent with your local .secrets.json.
+OPENROUTER_API_KEY=""
+ADMIN_PASSWORD="local-instructor-password"
+CLASS_CODE="0000"
