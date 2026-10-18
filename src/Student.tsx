@@ -13,12 +13,12 @@ import {
   Hand,
   LogOut,
   X,
-  KeyRound,
   ClipboardCheck,
   ChevronDown,
   BookOpen,
   MessageSquare,
   Award,
+  Home,
 } from "lucide-react";
 import {
   api,
@@ -151,15 +151,29 @@ export default function StudentApp({
       )?.id || 1
     );
   }),
-    [view, setView] = useState<"exercise" | "quiz" | "final">(
-      allRequiredDone ? "final" : "exercise",
-    ),
-    [modal, setModal] = useState<"help" | "pin" | null>(null),
+    [view, setView] = useState<"home" | "exercise" | "quiz" | "final">(() => {
+      try {
+        const stored = sessionStorage.getItem(`p4-view-${me.student.id}`);
+        if (
+          stored === "exercise" ||
+          stored === "quiz" ||
+          stored === "final"
+        )
+          return stored;
+      } catch {}
+      return "home";
+    }),
+    [modal, setModal] = useState<"help" | null>(null),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const completed = requiredLessons.filter((l) =>
     me.submissions.some((s) => s.lesson === l.id),
   ).length;
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`p4-view-${me.student.id}`, view);
+    } catch {}
+  }, [view, me.student.id]);
   const finalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelFinalSwitch = useCallback(() => {
     if (finalTimer.current) {
@@ -192,6 +206,24 @@ export default function StudentApp({
     const interval = setInterval(beat, 30000);
     return () => clearInterval(interval);
   }, [active, refresh]);
+  const goHome = () => {
+    cancelFinalSwitch();
+    setView("home");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+  const openExercise = (n: number) => {
+    cancelFinalSwitch();
+    if (config.lock_following && n > config.active_lesson) {
+      setNotice("รอผู้สอนเปิดข้อนี้ก่อนนะครับ");
+      return;
+    }
+    setActive(n);
+    setView("exercise");
+    try {
+      localStorage.setItem(`p4-page-${me.student.id}`, String(n));
+    } catch {}
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
   const navigate = (n: number) => {
     cancelFinalSwitch();
     if (config.lock_following && n > config.active_lesson) {
@@ -218,6 +250,15 @@ export default function StudentApp({
         </a>
         <div className="student-identity">
           <span>เลขที่ {me.student.number}</span>
+          {view !== "home" && (
+            <button
+              className="icon-btn"
+              aria-label="หน้าหลักของฉัน"
+              onClick={goHome}
+            >
+              <Home size={22} />
+            </button>
+          )}
           <button
             className="icon-btn"
             aria-label="ขอความช่วยเหลือ"
@@ -225,16 +266,10 @@ export default function StudentApp({
           >
             <Hand size={22} />
           </button>
-          <button
-            className="icon-btn"
-            aria-label="ตั้งรหัสนักเรียนใหม่"
-            onClick={() => setModal("pin")}
-          >
-            <KeyRound size={20} />
-          </button>
         </div>
       </header>
       <main className="exercise-main">
+        {view !== "home" && (
         <section className="exercise-progress">
           <div className="progress-title">
             <span>{me.student.name}</span>
@@ -285,7 +320,19 @@ export default function StudentApp({
             </button>
           )}
         </section>
-        {view === "quiz" ? (
+        )}
+        {view === "home" ? (
+          <StudentHome
+            me={me}
+            continueTo={active}
+            onExercise={openExercise}
+            onFinal={() => {
+              cancelFinalSwitch();
+              setView("final");
+              window.scrollTo({ top: 0, behavior: "instant" });
+            }}
+          />
+        ) : view === "quiz" ? (
           <StudentQuiz
             me={me}
             refresh={refresh}
@@ -337,80 +384,40 @@ export default function StudentApp({
       )}
       {modal && (
         <MiniModal
-          title={
-            modal === "help" ? "แจ้งปัญหาให้ผู้สอน" : "ตั้งรหัสนักเรียนใหม่"
-          }
+          title="แจ้งปัญหาให้ผู้สอน"
           onClose={() => setModal(null)}
         >
-          {modal === "help" ? (
-            <div className="stack">
-              {[
-                "เข้า Gemini / ChatGPT ไม่ได้",
-                "ไม่เข้าใจโจทย์",
-                "ส่งคำตอบไม่ได้",
-                "ใช้งานได้แล้ว",
-              ].map((reason) => (
-                <Btn
-                  key={reason}
-                  variant="secondary"
-                  busy={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      await api("/help", {
-                        reason: reason === "ใช้งานได้แล้ว" ? "" : reason,
-                      });
-                      setNotice("แจ้งผู้สอนแล้วครับ");
-                      setModal(null);
-                    } catch (e) {
-                      setNotice(message(e));
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  {reason}
-                  <ArrowRight size={17} />
-                </Btn>
-              ))}
-            </div>
-          ) : (
-            <form
-              className="stack"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const form = new FormData(e.currentTarget);
-                setBusy(true);
-                try {
-                  await api("/pin", { pin: form.get("pin") });
-                  setNotice("เปลี่ยนรหัสนักเรียนแล้ว");
-                  setModal(null);
-                } catch (e) {
-                  setNotice(message(e));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <p>ใช้เลขที่นักเรียนและรหัสนี้เมื่อกลับเข้าเรียน</p>
-              <label>
-                รหัสนักเรียน 4 หลัก
-                <input
-                  name="pin"
-                  required
-                  type="password"
-                  inputMode="numeric"
-                  pattern="[0-9]{4}"
-                  minLength={4}
-                  maxLength={4}
-                  autoComplete="new-password"
-                />
-              </label>
-              <Btn type="submit" busy={busy}>
-                บันทึกรหัส
+          <div className="stack">
+            {[
+              "เข้า Gemini / ChatGPT ไม่ได้",
+              "ไม่เข้าใจโจทย์",
+              "ส่งคำตอบไม่ได้",
+              "ใช้งานได้แล้ว",
+            ].map((reason) => (
+              <Btn
+                key={reason}
+                variant="secondary"
+                busy={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await api("/help", {
+                      reason: reason === "ใช้งานได้แล้ว" ? "" : reason,
+                    });
+                    setNotice("แจ้งผู้สอนแล้วครับ");
+                    setModal(null);
+                  } catch (e) {
+                    setNotice(message(e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {reason}
+                <ArrowRight size={17} />
               </Btn>
-            </form>
-          )}
+            ))}
+          </div>
         </MiniModal>
       )}
     </div>
@@ -1035,6 +1042,140 @@ function AnalysisChat({ paused, used }: { paused: boolean; used: number }) {
         ใช้ GLM 5.3 Flash ผ่าน OpenRouter · อ่านและตรวจตัวเลขก่อนนำคำตอบไปส่ง
       </small>
     </section>
+  );
+}
+function StudentHome({
+  me,
+  continueTo,
+  onExercise,
+  onFinal,
+}: {
+  me: Me;
+  continueTo: number;
+  onExercise: (id: number) => void;
+  onFinal: () => void;
+}) {
+  const saved = me.finalReview;
+  let ai: FinalReviewResult | null = null;
+  try {
+    ai =
+      saved && saved.status === "done" ? JSON.parse(saved.result) : null;
+  } catch {}
+  const completed = requiredLessons.filter((l) =>
+    me.submissions.some((s) => s.lesson === l.id),
+  ).length;
+  const scoreOf = (id: number) => {
+    const manual = me.submissions.find((s) => s.lesson === id)?.score;
+    if (manual != null) return { score: manual, by: "ผู้สอน" };
+    const a = ai?.lessons.find((l) => l.lesson === id);
+    if (a) return { score: a.score, by: "AI" };
+    return null;
+  };
+  const scored = requiredLessons
+    .map((l) => scoreOf(l.id))
+    .filter((s): s is { score: number; by: string } => !!s);
+  const average = scored.length
+    ? Math.round(
+        (scored.reduce((a, b) => a + b.score, 0) / scored.length) * 10,
+      ) / 10
+    : null;
+  const nextLesson = continueTo;
+  return (
+    <article className="exercise-page home-page">
+      <div className="exercise-heading">
+        <div className="exercise-number final">
+          <Home size={26} />
+        </div>
+        <div>
+          <div className="exercise-kicker">
+            {/^[1-5]$/.test(me.student.squad)
+              ? `กลุ่ม ${me.student.squad}`
+              : me.student.squad}{" "}
+            · เลขที่ {me.student.number}
+          </div>
+          <h1>หน้าหลักของฉัน</h1>
+        </div>
+      </div>
+      <div className="home-stats">
+        <div className="home-stat">
+          <span>ทำแล้ว</span>
+          <strong>
+            {completed} <small>/ {requiredLessons.length} ข้อหลัก</small>
+          </strong>
+          <p>
+            {completed === requiredLessons.length
+              ? "ครบทุกข้อหลักแล้ว กดดูคะแนนรวมได้เลย"
+              : "แตะข้อด้านล่างเพื่อดูหรือแก้คำตอบ"}
+          </p>
+        </div>
+        <div className="home-stat">
+          <span>คะแนนที่ได้</span>
+          <strong>
+            {average == null ? "—" : average} <small>/ 10</small>
+          </strong>
+          <p>
+            {scored.length
+              ? `ค่าเฉลี่ยจาก ${scored.length} ข้อที่มีคะแนน`
+              : "จะมีคะแนนหลังส่งงานและตรวจ"}
+          </p>
+        </div>
+      </div>
+      <div className="home-actions">
+        <Btn onClick={() => onExercise(nextLesson)}>
+          <BookOpen size={18} />
+          {completed === 0
+            ? "เริ่มทำแบบฝึกหัด"
+            : completed === requiredLessons.length
+              ? "ทำใหม่อีกครั้ง"
+              : "ทำแบบฝึกหัดต่อ"}
+        </Btn>
+        {completed === requiredLessons.length && (
+          <Btn variant="secondary" onClick={onFinal}>
+            <Award size={18} /> ดูคะแนนรวม / ให้ AI ตรวจ
+          </Btn>
+        )}
+      </div>
+      <section className="home-list">
+        <h2>แบบฝึกหัดของฉัน</h2>
+        {lessons.map((l) => {
+          const sub = me.submissions.find((s) => s.lesson === l.id),
+            sc = scoreOf(l.id);
+          return (
+            <button
+              className="home-row"
+              key={l.id}
+              onClick={() => onExercise(l.id)}
+            >
+              <span className="home-row-number">
+                {sub ? <Check size={16} /> : l.id}
+              </span>
+              <div>
+                <b>
+                  {l.title}
+                  {l.optional && <small className="opt">ไม่บังคับ</small>}
+                </b>
+                <small>
+                  {sub
+                    ? `ส่งแล้ว · ${sub.tool}`
+                    : l.optional
+                      ? "ยังไม่ได้ส่ง — ข้อนี้ไม่บังคับ"
+                      : "ยังไม่ได้ส่ง"}
+                </small>
+                {sub?.feedback && <p>{sub.feedback}</p>}
+              </div>
+              {sc && (
+                <span
+                  className={`score-chip ${sc.score >= 7 ? "good" : sc.score >= 4 ? "ok" : "low"}`}
+                >
+                  {sc.score}/10
+                  <em>{sc.by}</em>
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </section>
+    </article>
   );
 }
 function FinalReview({

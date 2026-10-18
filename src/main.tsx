@@ -33,7 +33,6 @@ import {
   Hand,
   Menu,
   Settings2,
-  Radio,
   Pause,
   Play,
   KeyRound,
@@ -243,33 +242,36 @@ function Login({
   instructor: boolean;
   onLogin: () => Promise<void>;
 }) {
-  const [mode, setMode] = useState<"register" | "return">("register"),
+  const [role, setRole] = useState<"choose" | "student" | "teacher">(
+      instructor ? "teacher" : "choose",
+    ),
+    [mode, setMode] = useState<"register" | "return">("register"),
+    [group, setGroup] = useState(""),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [assigned, setAssigned] = useState("");
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setBusy(true);
     setError("");
     const form = new FormData(e.currentTarget);
     try {
-      if (instructor) {
+      if (role === "teacher") {
         await api("/admin/login", { password: form.get("password") });
         await onLogin();
       } else if (mode === "return") {
-        await api("/login", {
-          number: form.get("number"),
-          recovery: form.get("recovery"),
-        });
+        await api("/login", { number: form.get("number") });
         await onLogin();
       } else {
-        const r = await api<{ recovery: string }>("/register", {
-          number: form.get("number"),
+        if (!group) {
+          setError("กรุณาเลือกกลุ่มเรียนก่อน");
+          return;
+        }
+        const r = await api<{ number: string }>("/register", {
           name: form.get("name"),
-          squad: form.get("squad"),
-          code: form.get("code"),
-          pin: form.get("pin"),
+          squad: group,
         });
-        await onLogin();
+        setAssigned(r.number);
       }
     } catch (e) {
       setError(errorText(e));
@@ -310,7 +312,7 @@ function Login({
               <BookOpen size={17} /> 8 แบบฝึกหัด
             </span>
             <span>
-              <Sparkles size={17} /> เริ่มได้ฟรี
+              <Sparkles size={17} /> 5 กลุ่มเรียน
             </span>
           </div>
           <div className="mission-preview">
@@ -349,86 +351,116 @@ function Login({
           </div>
         </section>
         <section className="enrollment">
-          <div className="enroll-top">
-            <span className="mini-label">
-              {instructor ? "INSTRUCTOR ACCESS" : "LET’S GET STARTED"}
-            </span>
-            <span className="pill">P4 CLASSROOM</span>
-          </div>
-          <div className="enroll-symbol">
-            {instructor ? <Monitor size={29} /> : <GraduationCap size={31} />}
-          </div>
-          <h2>
-            {instructor ? "ห้องควบคุมสำหรับผู้สอน" : "พร้อมเริ่มภารกิจหรือยัง?"}
-          </h2>
-          <p className="muted">
-            {instructor
-              ? "ติดตามชั้นเรียน ดูผลงาน และนำเสนอบนจอ"
-              : "ลงชื่อเข้าห้องเรียน แล้วเริ่มฝึกไปพร้อมกัน"}
-          </p>
-          {!instructor && (
-            <div className="segmented">
-              <button
-                className={mode === "register" ? "selected" : ""}
-                onClick={() => {
-                  setMode("register");
-                  setError("");
-                }}
-              >
-                ลงชื่อครั้งแรก
-              </button>
-              <button
-                className={mode === "return" ? "selected" : ""}
-                onClick={() => {
-                  setMode("return");
-                  setError("");
-                }}
-              >
-                กลับเข้าเรียน
-              </button>
-            </div>
-          )}
-          <form onSubmit={submit} className="stack">
-            {instructor ? (
-              <label>
-                รหัสผ่านผู้สอน
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  placeholder="กรอกรหัสผ่านสำหรับผู้สอน"
-                />
-              </label>
-            ) : (
-              <>
-                <div className={mode === "register" ? "form-row" : ""}>
+          {role === "choose" ? (
+            <>
+              <div className="enroll-top">
+                <span className="mini-label">เลือกบทบาทของคุณ</span>
+                <span className="pill">P4 CLASSROOM</span>
+              </div>
+              <h2>เข้าใช้งานในบทบาทใด</h2>
+              <p className="muted">นักเรียนลงชื่อเพื่อทำแบบฝึกหัด · ผู้สอนดูแลห้องเรียน</p>
+              <div className="role-cards">
+                <button className="role-card" onClick={() => setRole("student")}>
+                  <span className="role-icon student">
+                    <GraduationCap size={30} />
+                  </span>
+                  <b>นักเรียน</b>
+                  <small>
+                    ลงชื่อรับเลขนักเรียน 4 หลัก หรือเข้าสู่ระบบด้วยเลขที่มีอยู่
+                  </small>
+                  <ArrowRight size={18} />
+                </button>
+                <button className="role-card" onClick={() => setRole("teacher")}>
+                  <span className="role-icon teacher">
+                    <Monitor size={27} />
+                  </span>
+                  <b>ผู้สอน</b>
+                  <small>เข้าสู่ห้องควบคุมด้วยรหัสผ่านผู้สอน</small>
+                  <ArrowRight size={18} />
+                </button>
+              </div>
+              <div className="enroll-note">
+                <ShieldCheck size={16} /> ไม่ต้องติดตั้งแอป · ใช้งานผ่านเบราว์เซอร์บนมือถือ
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="enroll-top">
+                <span className="mini-label">
+                  {role === "teacher" ? "INSTRUCTOR ACCESS" : "STUDENT ACCESS"}
+                </span>
+                <span className="pill">P4 CLASSROOM</span>
+              </div>
+              <div className="enroll-symbol">
+                {role === "teacher" ? (
+                  <Monitor size={29} />
+                ) : (
+                  <GraduationCap size={31} />
+                )}
+              </div>
+              <h2>
+                {role === "teacher"
+                  ? "ห้องควบคุมสำหรับผู้สอน"
+                  : mode === "return"
+                    ? "เข้าสู่ระบบด้วยเลขนักเรียน"
+                    : "ลงชื่อรับเลขนักเรียน"}
+              </h2>
+              <p className="muted">
+                {role === "teacher"
+                  ? "ติดตามชั้นเรียน ดูผลงาน และนำเสนอบนจอ"
+                  : "ไม่ต้องมีรหัสห้องเรียน เลือกกลุ่มและกรอกชื่อก็เริ่มได้เลย"}
+              </p>
+              {role === "student" && (
+                <div className="segmented">
+                  <button
+                    className={mode === "register" ? "selected" : ""}
+                    onClick={() => {
+                      setMode("register");
+                      setError("");
+                    }}
+                  >
+                    ลงชื่อครั้งแรก
+                  </button>
+                  <button
+                    className={mode === "return" ? "selected" : ""}
+                    onClick={() => {
+                      setMode("return");
+                      setError("");
+                    }}
+                  >
+                    เข้าสู่ระบบ
+                  </button>
+                </div>
+              )}
+              <form onSubmit={submit} className="stack">
+                {role === "teacher" ? (
                   <label>
-                    เลขที่นักเรียน
+                    รหัสผ่านผู้สอน
                     <input
-                      name="number"
+                      name="password"
+                      type="password"
                       required
-                      inputMode="numeric"
-                      pattern="[0-9]{1,6}"
-                      maxLength={6}
-                      placeholder="เช่น 024"
-                      autoComplete="off"
+                      autoComplete="current-password"
+                      placeholder="กรอกรหัสผ่านสำหรับผู้สอน"
                     />
                   </label>
-                  {mode === "register" && (
-                    <label>
-                      หมู่ / กลุ่ม
-                      <input
-                        name="squad"
-                        required
-                        maxLength={30}
-                        placeholder="เช่น กลุ่ม 05"
-                      />
-                    </label>
-                  )}
-                </div>
-                {mode === "register" ? (
+                ) : mode === "register" ? (
                   <>
+                    <label>
+                      เลือกกลุ่มเรียน
+                      <div className="group-picker" role="group" aria-label="กลุ่มเรียน 1-5">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button
+                            type="button"
+                            key={n}
+                            className={group === String(n) ? "selected" : ""}
+                            onClick={() => setGroup(String(n))}
+                          >
+                            กลุ่ม {n}
+                          </button>
+                        ))}
+                      </div>
+                    </label>
                     <label>
                       ชื่อ–สกุล
                       <input
@@ -440,36 +472,6 @@ function Login({
                         placeholder="ชื่อที่ใช้ในห้องเรียน"
                       />
                     </label>
-                    <label>
-                      รหัสห้องเรียน
-                      <input
-                        name="code"
-                        required
-                        maxLength={4}
-                        minLength={4}
-                        pattern="[0-9]{4}"
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="รหัสห้องเรียน 4 หลัก"
-                      />
-                    </label>
-                    <label>
-                      ตั้งรหัสนักเรียน 4 หลัก
-                      <input
-                        name="pin"
-                        type="password"
-                        inputMode="numeric"
-                        pattern="[0-9]{4}"
-                        minLength={4}
-                        maxLength={4}
-                        required
-                        autoComplete="new-password"
-                        placeholder="ตั้งตัวเลข 4 หลักไว้กลับเข้าเรียน"
-                      />
-                      <small>
-                        ใช้เลขที่นักเรียนและรหัสนี้เมื่อกลับมาเรียนครั้งต่อไป
-                      </small>
-                    </label>
                     <label className="check-label">
                       <input type="checkbox" required />
                       ฉันจะใช้ข้อมูลสมมติในการฝึก
@@ -479,55 +481,87 @@ function Login({
                   </>
                 ) : (
                   <label>
-                    รหัสนักเรียน 4 หลัก
+                    เลขนักเรียน 4 หลัก
                     <input
-                      name="recovery"
-                      type="password"
+                      name="number"
+                      required
                       inputMode="numeric"
+                      pattern="[0-9]{4}"
                       minLength={4}
                       maxLength={4}
-                      pattern="[0-9]{4}"
-                      required
                       autoComplete="off"
-                      placeholder="รหัส 4 หลักที่ตั้งไว้"
+                      placeholder="เลขที่ได้รับตอนลงชื่อ"
                     />
-                    <small>หากลืมรหัส ให้ผู้สอนตั้งรหัสใหม่ให้ได้</small>
+                    <small>ใช้เลขนักเรียนนี้เข้าสู่ระบบทุกครั้ง</small>
                   </label>
                 )}
-              </>
-            )}
-            {error && <Notice type="error">{error}</Notice>}
-            {!config && (
-              <Notice type="error">
-                ยังเชื่อมต่อห้องเรียนไม่ได้ กรุณารีเฟรชหน้า
-              </Notice>
-            )}
-            <Button
-              busy={busy}
-              disabled={
-                !config ||
-                (!instructor && mode === "register" && !config.admission_open)
-              }
-              type="submit"
-            >
-              {instructor
-                ? "เข้าสู่ห้องควบคุม"
-                : mode === "return"
-                  ? "กลับเข้าสู่ห้องเรียน"
-                  : config?.admission_open
-                    ? "เข้าห้องเรียน"
-                    : "ปิดรับลงชื่อแล้ว"}
-              <ArrowRight size={18} />
-            </Button>
-          </form>
-          <div className="enroll-note">
-            <ShieldCheck size={16} />{" "}
-            {instructor
-              ? "ข้อมูลผลงานเปิดดูได้เฉพาะผู้สอน"
-              : "ไม่ต้องติดตั้งแอป · ใช้งานผ่านเบราว์เซอร์บนมือถือ"}
-          </div>
+                {error && <Notice type="error">{error}</Notice>}
+                {!config && (
+                  <Notice type="error">
+                    ยังเชื่อมต่อห้องเรียนไม่ได้ กรุณารีเฟรชหน้า
+                  </Notice>
+                )}
+                <Button
+                  busy={busy}
+                  disabled={
+                    !config ||
+                    (role === "student" &&
+                      mode === "register" &&
+                      !config.admission_open)
+                  }
+                  type="submit"
+                >
+                  {role === "teacher"
+                    ? "เข้าสู่ห้องควบคุม"
+                    : mode === "return"
+                      ? "เข้าสู่ระบบ"
+                      : config?.admission_open
+                        ? "ลงชื่อและรับเลขนักเรียน"
+                        : "ปิดรับลงชื่อแล้ว"}
+                  <ArrowRight size={18} />
+                </Button>
+                <button
+                  type="button"
+                  className="text-btn"
+                  onClick={() => {
+                    setRole("choose");
+                    setError("");
+                  }}
+                >
+                  <ArrowLeft size={16} /> กลับไปเลือกบทบาท
+                </button>
+              </form>
+              <div className="enroll-note">
+                <ShieldCheck size={16} />{" "}
+                {role === "teacher"
+                  ? "ข้อมูลผลงานเปิดดูได้เฉพาะผู้สอน"
+                  : "เข้าเรียนได้ทันที ไม่ต้องรอผู้สอนเปิดห้อง"}
+              </div>
+            </>
+          )}
         </section>
       </main>
+      {assigned && (
+        <div
+          className="assigned-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="ได้รับเลขนักเรียนแล้ว"
+        >
+          <div className="assigned-card">
+            <CheckCircle2 size={32} />
+            <h2>ลงชื่อสำเร็จ</h2>
+            <p>เลขนักเรียนของคุณคือ</p>
+            <strong className="assigned-number">{assigned}</strong>
+            <small>
+              จดหรือ capture หน้าจอนี้เก็บไว้ ใช้เลข 4 หลักนี้เข้าสู่ระบบทุกครั้ง
+            </small>
+            <Button type="button" onClick={() => void onLogin()}>
+              เข้าห้องเรียน <ArrowRight size={18} />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -538,6 +572,7 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
     [tab, setTab] = useState("overview"),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("all"),
+    [group, setGroup] = useState("all"),
     [selected, setSelected] = useState<string | null>(null),
     [showSettings, setShowSettings] = useState(false),
     [showQr, setShowQr] = useState(false),
@@ -575,19 +610,36 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
         {error && <Button onClick={() => void refresh()}>ลองใหม่</Button>}
       </div>
     );
-  const subs = data.submissions,
-    registered = data.students.length,
-    online = data.students.filter(
-      (s) => s.last_seen > data.serverTime - 90000,
-    ).length,
-    finished = data.students.filter((s) =>
+  const groupStudents =
+      group === "all"
+        ? data.students
+        : data.students.filter((s) => s.squad === group),
+    subs = data.submissions.filter((s) =>
+      groupStudents.some((p) => p.id === s.student_id),
+    ),
+    quizzes = data.quizzes.filter((q) =>
+      groupStudents.some((p) => p.id === q.student_id),
+    ),
+    registered = groupStudents.length,
+    finished = groupStudents.filter((s) =>
       requiredLessons.every((l) =>
         subs.some((x) => x.student_id === s.id && x.lesson === l.id),
       ),
     ).length,
-    help = data.students.filter((s) => s.help),
+    help = groupStudents.filter((s) => s.help),
     studentSubs = (id: string) => subs.filter((s) => s.student_id === id);
-  const people = data.students.filter(
+  const aiScores = new Map<string, Map<number, number>>();
+  for (const fr of data.finalReviews) {
+    try {
+      const parsed = JSON.parse(fr.result) as {
+        lessons?: { lesson: number; score: number }[];
+      };
+      const m = new Map<number, number>();
+      for (const row of parsed.lessons || []) m.set(row.lesson, row.score);
+      aiScores.set(fr.student_id, m);
+    } catch {}
+  }
+  const people = groupStudents.filter(
     (s) =>
       `${s.number} ${s.name} ${s.squad}`
         .toLowerCase()
@@ -695,6 +747,19 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
               </p>
             </div>
             <div className="heading-actions">
+              <select
+                aria-label="เลือกกลุ่มเรียน"
+                className="group-select"
+                value={group}
+                onChange={(e) => setGroup(e.target.value)}
+              >
+                <option value="all">ทุกกลุ่ม</option>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={String(n)}>
+                    กลุ่ม {n}
+                  </option>
+                ))}
+              </select>
               <a className="btn secondary" href="/api/admin/export">
                 <Download size={17} /> ส่งออก CSV
               </a>
@@ -716,26 +781,29 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
           )}
           <div className="metrics-grid">
             <Metric
-              label="ลงชื่อเข้าห้องเรียน"
+              label={group === "all" ? "นักเรียนทั้งห้อง" : `นักเรียนกลุ่ม ${group}`}
               value={registered}
-              total={data.settings.expected}
               icon={Users}
-              note={`ยังไม่ลงชื่อ ${Math.max(0, data.settings.expected - registered)} คน`}
+              note={
+                group === "all"
+                  ? `จาก 5 กลุ่มเรียน`
+                  : `กลุ่ม ${group} · เลือกดูได้จากตัวกรอง`
+              }
               color="green"
-            />
-            <Metric
-              label="ออนไลน์ตอนนี้"
-              value={online}
-              icon={Radio}
-              note="มีการใช้งานใน 90 วินาทีล่าสุด"
-              color="blue"
             />
             <Metric
               label="ส่งครบ 7 ข้อหลัก"
               value={finished}
               icon={CheckCircle2}
-              note={`${registered ? Math.round((finished / registered) * 100) : 0}% ของผู้ลงชื่อ`}
+              note={`${registered ? Math.round((finished / registered) * 100) : 0}% ของนักเรียนที่แสดง`}
               color="orange"
+            />
+            <Metric
+              label="ยังไม่ครบ"
+              value={registered - finished}
+              icon={Clock}
+              note="ยังส่งไม่ครบทุกข้อหลัก"
+              color="blue"
             />
             <Metric
               label="ต้องการความช่วยเหลือ"
@@ -752,14 +820,24 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                   <div>
                     <h3>ความคืบหน้าแต่ละภารกิจ</h3>
                     <p className="muted">
-                      จำนวนผู้ส่งงาน / ผู้ลงชื่อ {registered} คน
+                      ส่งแล้ว / นักเรียน {registered} คน · ถูกต้อง = คะแนนตรวจรวมของ
+                      AI ตั้งแต่ 5 ขึ้นไป
                     </p>
                   </div>
                   <BookOpen size={20} />
                 </div>
                 <div className="mission-bars">
                   {lessons.map((l) => {
-                    const count = subs.filter((s) => s.lesson === l.id).length;
+                    const sent = subs.filter((s) => s.lesson === l.id);
+                    let correct = 0,
+                      incorrect = 0;
+                    for (const s of sent) {
+                      const score = aiScores.get(s.student_id)?.get(l.id);
+                      if (score == null) continue;
+                      if (score >= 5) correct++;
+                      else incorrect++;
+                    }
+                    const unchecked = sent.length - correct - incorrect;
                     return (
                       <button
                         key={l.id}
@@ -776,13 +854,18 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                           <div className="bar-track">
                             <i
                               style={{
-                                width: `${registered ? (count / registered) * 100 : 0}%`,
+                                width: `${registered ? (sent.length / registered) * 100 : 0}%`,
                               }}
                             />
                           </div>
+                          <small className="mission-verdict">
+                            ส่ง {sent.length} · ถูกต้อง {correct} · ไม่ถูกต้อง{" "}
+                            {incorrect}
+                            {unchecked > 0 ? ` · ยังไม่ตรวจ ${unchecked}` : ""}
+                          </small>
                         </div>
                         <strong>
-                          {count}
+                          {sent.length}
                           <small>/{registered}</small>
                         </strong>
                       </button>
@@ -972,10 +1055,10 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                     {people.map((s) => {
                       const work = studentSubs(s.id),
                         isOnline = s.last_seen > data.serverTime - 90000,
-                        pre = data.quizzes.find(
+                        pre = quizzes.find(
                           (q) => q.student_id === s.id && q.kind === "pre",
                         ),
-                        post = data.quizzes.find(
+                        post = quizzes.find(
                           (q) => q.student_id === s.id && q.kind === "post",
                         );
                       return (
@@ -994,7 +1077,11 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
                               </span>
                             </button>
                           </td>
-                          <td>{s.squad}</td>
+                          <td>
+                            {/^[1-5]$/.test(s.squad)
+                              ? `กลุ่ม ${s.squad}`
+                              : s.squad}
+                          </td>
                           <td>
                             <span
                               className={`presence ${isOnline ? "online" : ""}`}
@@ -1114,7 +1201,7 @@ function InstructorApp({ onLogout }: { onLogout: () => void }) {
           }}
         />
       )}
-      {showQr && <QrModal code={data.classCode} onClose={closeQr} />}{" "}
+      {showQr && <QrModal onClose={closeQr} />}{" "}
       {presentation && (
         <Presentation {...presentation} onClose={closePresentation} />
       )}
@@ -1207,12 +1294,15 @@ function StudentDetail({
         <>
           <div className="detail-person">
             <span className="roster-avatar large">
-              {detail.student.number.padStart(3, "0")}
+              {detail.student.number.slice(-3).padStart(3, "0")}
             </span>
             <div>
               <b>{detail.student.name}</b>
               <small>
-                {detail.student.squad} · ส่งแล้ว{" "}
+                {/^[1-5]$/.test(detail.student.squad)
+                  ? `กลุ่ม ${detail.student.squad}`
+                  : detail.student.squad}{" "}
+                · เลขที่ {detail.student.number} · ส่งแล้ว{" "}
                 {
                   detail.submissions.filter(
                     (s) => !lessons.find((l) => l.id === s.lesson)?.optional,
@@ -1221,23 +1311,6 @@ function StudentDetail({
                 /7 ข้อหลัก
               </small>
             </div>
-            <Button
-              variant="secondary small"
-              onClick={async () => {
-                try {
-                  const r = await api<{ recovery: string }>("/admin/recovery", {
-                    id,
-                  });
-                  setMessage(
-                    `รหัสนักเรียนใหม่: ${r.recovery} — แจ้งให้ผู้เรียนส่วนตัว เซสชันเดิมถูกออกจากระบบแล้ว`,
-                  );
-                } catch (e) {
-                  setError(errorText(e));
-                }
-              }}
-            >
-              <KeyRound size={15} /> ตั้งรหัส 4 หลักใหม่
-            </Button>
           </div>
           {detail.student.help && (
             <div className="detail-help">
@@ -1605,7 +1678,7 @@ function SettingsModal({
     </Modal>
   );
 }
-function QrModal({ code, onClose }: { code: string; onClose: () => void }) {
+function QrModal({ onClose }: { onClose: () => void }) {
   const [qr, setQr] = useState(""),
     [copied, setCopied] = useState(false);
   const url = window.location.origin;
@@ -1624,11 +1697,11 @@ function QrModal({ code, onClose }: { code: string; onClose: () => void }) {
         ) : (
           <Loader2 className="spin" />
         )}
-        <p>เปิดกล้องมือถือ สแกน QR แล้วลงชื่อ</p>
-        <div className="class-code">
-          <span>รหัสห้องเรียน</span>
-          <strong>{code}</strong>
-        </div>
+        <p>เปิดกล้องมือถือ สแกน QR แล้วกด “นักเรียน”</p>
+        <p className="muted">
+          ไม่ต้องใช้รหัสห้องเรียน — นักเรียนเลือกกลุ่ม กรอกชื่อ
+          แล้วรับเลขนักเรียน 4 หลักไว้เข้าสู่ระบบ
+        </p>
         <p className="muted">{url}</p>
         <Button
           variant="secondary"
@@ -1685,6 +1758,10 @@ function App() {
   }, []);
   const logout = async () => {
     await api("/logout", {});
+    try {
+      for (const key of Object.keys(sessionStorage))
+        if (key.startsWith("p4-view-")) sessionStorage.removeItem(key);
+    } catch {}
     setMe(null);
     window.location.href = window.location.pathname.startsWith("/instructor")
       ? "/instructor"

@@ -1615,3 +1615,274 @@ body {
     padding: 18px;
   }
 }
+
+/* ---- Role chooser + group registration ---- */
+.role-cards {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+.role-card {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 18px 52px 18px 18px;
+  border: 1px solid #e0cda8;
+  border-radius: 13px;
+  background: #fffdf8;
+  box-shadow: 0 6px 22px #7450290a;
+  cursor: pointer;
+}
+.role-card:hover {
+  border-color: #b28c4e;
+}
+.role-card > svg {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #b28c4e;
+}
+.role-card b {
+  font-size: 17px;
+  color: #513627;
+}
+.role-card small {
+  font-size: 12px;
+  color: #89715a;
+  line-height: 1.7;
+}
+.role-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.role-icon.student {
+  background: #67432d;
+  color: #ffefcf;
+}
+.role-icon.teacher {
+  background: #3b2720;
+  color: #d5b574;
+}
+.group-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 7px;
+}
+.group-picker button {
+  padding: 11px 4px;
+  border-radius: 9px;
+  border: 1px solid #dfd1bb;
+  background: #fffcf6;
+  color: #7d6752;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.group-picker button.selected {
+  background: #67432d;
+  border-color: #67432d;
+  color: #fff5e3;
+}
+.assigned-overlay {
+  position: fixed;
+  inset: 0;
+  background: #2c1c15e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+}
+.assigned-card {
+  background: #fffdf8;
+  border-radius: 16px;
+  padding: 28px 26px;
+  max-width: 380px;
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  text-align: center;
+  color: #513627;
+}
+.assigned-card > svg {
+  color: #7d9a5c;
+}
+.assigned-card h2 {
+  font-size: 20px;
+}
+.assigned-card p {
+  margin: 0;
+  color: #89715a;
+  font-size: 14px;
+}
+.assigned-number {
+  font: 700 46px "Manrope Variable", sans-serif;
+  letter-spacing: 8px;
+  color: #67432d;
+  background: #f6ecd8;
+  border: 1px dashed #cbb079;
+  border-radius: 12px;
+  padding: 10px 22px 10px 30px;
+}
+.assigned-card small {
+  color: #a18a70;
+  font-size: 11.5px;
+  line-height: 1.8;
+}
+
+/* ---- Student home ---- */
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.home-stat {
+  background: #fffdfa;
+  border: 1px solid #e6dac8;
+  border-radius: 13px;
+  padding: 17px 18px;
+  display: grid;
+  gap: 3px;
+}
+.home-stat span {
+  font-size: 11.5px;
+  color: #a18a70;
+}
+.home-stat strong {
+  font: 650 30px "Manrope Variable", sans-serif;
+  color: #67432d;
+  line-height: 1.25;
+}
+.home-stat strong small {
+  font-size: 13px;
+  color: #a18a70;
+  font-weight: 550;
+}
+.home-stat p {
+  font-size: 11.5px;
+  color: #89715a;
+  margin: 0;
+  line-height: 1.7;
+}
+.home-actions {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.home-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.home-list h2 {
+  font-size: 16px;
+  color: #64472f;
+}
+.home-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  text-align: left;
+  background: #fffdfa;
+  border: 1px solid #e6dac8;
+  border-radius: 13px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.home-row > div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.home-row b {
+  font-size: 14.5px;
+  color: #513627;
+}
+.home-row b .opt {
+  margin-left: 7px;
+  font-size: 10px;
+  background: #eee1cb;
+  color: #9a763d;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.home-row small {
+  font-size: 11.5px;
+  color: #a18a70;
+}
+.home-row p {
+  margin: 0;
+  font-size: 12px;
+  color: #7d6752;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-row-number {
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #dfd1bb;
+  background: #fffcf6;
+  color: #a19079;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 14px "Manrope Variable", sans-serif;
+}
+.home-row .score-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  line-height: 1.2;
+}
+.home-row .score-chip em {
+  font: 550 9.5px "Manrope Variable", sans-serif;
+  font-style: normal;
+  opacity: 0.85;
+}
+
+/* ---- Instructor group dropdown + mission verdict ---- */
+.group-select {
+  border: 1px solid #d8c6a8;
+  background: #fffcf5;
+  color: #513627;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.mission-verdict {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: #9a8265;
+}
+@media (max-width: 640px) {
+  .home-stats {
+    grid-template-columns: 1fr;
+  }
+  .group-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .assigned-number {
+    font-size: 38px;
+    letter-spacing: 5px;
+  }
+  .heading-actions {
+    flex-wrap: wrap;
+  }
+}

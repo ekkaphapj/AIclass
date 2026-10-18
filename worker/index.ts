@@ -248,68 +248,56 @@ async function api(req: Request, env: Cloudflare.Env) {
   if (path === "/api/register" && method === "POST") {
     await rateLimit(req, env, "register", 200);
     const b = await body(req);
-    if (
-      !(await equal(str(b.code, 100), env.CLASS_CODE || "")) ||
-      !env.CLASS_CODE
-    )
-      throw new HttpError(403, "รหัสห้องเรียนไม่ถูกต้อง");
     const c = await settings(env);
     if (!c.admission_open) throw new HttpError(403, "ผู้สอนปิดรับลงชื่อแล้ว");
-    const pin = str(b.pin, 10);
-    if (!/^\d{4}$/.test(pin))
-      throw new HttpError(400, "ตั้งรหัสนักเรียนเป็นตัวเลข 4 หลัก");
-    const number = str(b.number, 12),
-      name = str(b.name, 100),
+    const name = str(b.name, 100),
       squad = str(b.squad, 30);
-    if (!/^\d{1,6}$/.test(number) || name.length < 2 || !squad)
-      throw new HttpError(400, "กรุณากรอกเลขที่ ชื่อ และหมู่/กลุ่มให้ครบ");
-    const normalized = String(Number(number));
-    if (
-      await env.DB.prepare("SELECT id FROM students WHERE number=?")
-        .bind(normalized)
-        .first()
-    )
-      throw new HttpError(
-        409,
-        "เลขที่นี้ลงชื่อแล้ว ใช้รหัสกลับเข้าเรียน หรือขอให้ผู้สอนช่วย",
-      );
+    if (name.length < 2 || !/^[1-5]$/.test(squad))
+      throw new HttpError(400, "กรุณากรอกชื่อ-นามสกุล และเลือกกลุ่มเรียน 1–5");
     const count = await env.DB.prepare(
       "SELECT COUNT(*) n FROM students",
     ).first<{ n: number }>();
     if ((count?.n || 0) >= 300) throw new HttpError(403, "ห้องเรียนเต็มแล้ว");
-    const id = crypto.randomUUID(),
-      recovery = pin,
-      t = now();
-    try {
-      await env.DB.prepare(
-        "INSERT INTO students(id,number,name,squad,recovery_hash,created_at,last_seen) VALUES(?,?,?,?,?,?,?)",
-      )
-        .bind(id, normalized, name, squad, await hash(recovery), t, t)
-        .run();
-    } catch {
-      throw new HttpError(409, "เลขที่นี้ลงชื่อแล้ว กรุณาใช้รหัสกลับเข้าเรียน");
+    const t = now(),
+      filler = await hash(crypto.randomUUID());
+    let id = "",
+      number = "";
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const candidate = String(1000 + Math.floor(Math.random() * 9000));
+      try {
+        id = crypto.randomUUID();
+        await env.DB.prepare(
+          "INSERT INTO students(id,number,name,squad,recovery_hash,created_at,last_seen) VALUES(?,?,?,?,?,?,?)",
+        )
+          .bind(id, candidate, name, squad, filler, t, t)
+          .run();
+        number = candidate;
+        break;
+      } catch {
+        // เลขนี้ถูกใช้แล้ว สุ่มใหม่
+      }
     }
-    return json({ ok: true, recovery }, 201, {
+    if (!number)
+      throw new HttpError(503, "สร้างเลขนักเรียนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    return json({ ok: true, number }, 201, {
       "Set-Cookie": await makeSession(req, env, id, "student"),
     });
   }
   if (path === "/api/login" && method === "POST") {
     const b = await body(req);
     await rateLimit(req, env, "login-shared-network", 600);
-    await rateLimit(req, env, "login-" + String(Number(str(b.number, 12))), 15);
-    const row = await env.DB.prepare(
-      "SELECT id,recovery_hash FROM students WHERE number=?",
-    )
-      .bind(String(Number(str(b.number, 12))))
-      .first<{ id: string; recovery_hash: string }>();
-    if (
-      !row ||
-      !(await equal(
-        await hash(str(b.recovery, 30).toUpperCase()),
-        row.recovery_hash,
-      ))
-    )
-      throw new HttpError(403, "เลขที่หรือรหัสกลับเข้าเรียนไม่ถูกต้อง");
+    const number = str(b.number, 12);
+    await rateLimit(req, env, "login-" + number, 15);
+    if (!/^\d{4}$/.test(number))
+      throw new HttpError(400, "เลขนักเรียนเป็นตัวเลข 4 หลัก");
+    const row = await env.DB.prepare("SELECT id FROM students WHERE number=?")
+      .bind(number)
+      .first<{ id: string }>();
+    if (!row)
+      throw new HttpError(
+        403,
+        "ไม่พบเลขนักเรียนนี้ กรุณาตรวจอีกครั้ง หรือลงชื่อใหม่",
+      );
     return json({ ok: true }, 200, {
       "Set-Cookie": await makeSession(req, env, row.id, "student"),
     });
@@ -337,16 +325,6 @@ async function api(req: Request, env: Cloudflare.Env) {
     return json({ ok: true }, 200, {
       "Set-Cookie": "p4_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
     });
-  }
-  if (path === "/api/pin" && method === "POST") {
-    const id = await student(req, env),
-      b = await body(req),
-      pin = str(b.pin, 10);
-    if (!/^\d{4}$/.test(pin)) throw new HttpError(400, "ใช้ตัวเลข 4 หลัก");
-    await env.DB.prepare("UPDATE students SET recovery_hash=? WHERE id=?")
-      .bind(await hash(pin), id)
-      .run();
-    return json({ ok: true });
   }
   if (path === "/api/chat" && method === "GET") {
     const id = await student(req, env);
@@ -1033,7 +1011,8 @@ async function api(req: Request, env: Cloudflare.Env) {
   }
   if (path === "/api/admin/overview" && method === "GET") {
     await admin(req, env);
-    const [c, students, submissions, quizzes, usage] = await Promise.all([
+    const [c, students, submissions, quizzes, usage, reviews] =
+      await Promise.all([
       settings(env),
       env.DB.prepare(
         `SELECT ${projection} FROM students ORDER BY CAST(number AS INTEGER)`,
@@ -1045,6 +1024,9 @@ async function api(req: Request, env: Cloudflare.Env) {
       env.DB.prepare(
         "SELECT COUNT(*) total,SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) completed,SUM(CASE WHEN status='running' THEN 1 ELSE 0 END) running,COALESCE(SUM(cost),0) cost FROM ai_jobs",
       ).first(),
+      env.DB.prepare(
+        "SELECT student_id,result,created_at FROM final_reviews WHERE status='done'",
+      ).all(),
     ]);
     return json({
       settings: c,
@@ -1052,9 +1034,9 @@ async function api(req: Request, env: Cloudflare.Env) {
       submissions: submissions.results,
       quizzes: quizzes.results,
       usage,
+      finalReviews: reviews.results,
       serverTime: now(),
       model: env.AI_MODEL,
-      classCode: env.CLASS_CODE,
     });
   }
   if (path.startsWith("/api/admin/student/") && method === "GET") {
@@ -1123,24 +1105,6 @@ async function api(req: Request, env: Cloudflare.Env) {
       .bind(str(b.id, 80))
       .run();
     return json({ ok: true });
-  }
-  if (path === "/api/admin/recovery" && method === "POST") {
-    await admin(req, env);
-    const b = await body(req),
-      id = str(b.id, 80),
-      recovery = String(
-        crypto.getRandomValues(new Uint32Array(1))[0] % 10000,
-      ).padStart(4, "0");
-    const changed = await env.DB.prepare(
-      "UPDATE students SET recovery_hash=? WHERE id=?",
-    )
-      .bind(await hash(recovery), id)
-      .run();
-    if (!changed.meta.changes) throw new HttpError(404, "ไม่พบผู้เรียน");
-    await env.DB.prepare("DELETE FROM sessions WHERE student_id=?")
-      .bind(id)
-      .run();
-    return json({ recovery });
   }
   if (path === "/api/admin/export" && method === "GET") {
     await admin(req, env);

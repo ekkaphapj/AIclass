@@ -6,9 +6,9 @@ Mobile practice classroom and desktop instructor monitor on Cloudflare Workers +
 
 ## Student flow
 
-Register with class code, roster number/name/group, and a self-selected four-digit numeric PIN. Leading zeroes are preserved. Return using roster number + PIN. Existing students can set a PIN with the key button; an instructor can reset it to four digits, invalidating old student sessions.
+The landing page first asks for a role: student or instructor. Students register by choosing their class group (1–5) and entering their name; the system then assigns a unique four-digit student number, shown once on screen — that number is the only credential needed to log in again on any device. There is no class code and no need to wait for the teacher. Login throttles still apply.
 
-One exercise per page, previous/next buttons, clickable steps, progress based on seven required submissions, and editable answers. Local and server drafts preserve unsent work; only explicit submission appears to the instructor. Returning students resume the exact page they left (device storage first, then the server-tracked current lesson), so logging in again on any device continues where they stopped. Re-submission clears previous feedback/score for a fresh review. Exercises 1–5 collect pasted external AI answers; 4/5 provide downloadable training images. Exercise 6 has an 18-row fictional dataset, five separately stored answers and persistent contextual OpenRouter chat. Exercises 7/8 accept HTTPS links to Gemini work. Once all seven required exercises are submitted, students enter a final summary page: one button runs a single OpenRouter grading pass with per-exercise 0–10 scores, an average, and a reachability check of the music/infographic links (max 5 runs per student; teacher manual scores stay official). Pre/post quizzes remain available in the footer.
+After login students land on their home view: how many required exercises are done, the score received so far, a per-exercise list with their own answers and any teacher feedback, and a start/continue/redo button. A mid-session reload returns to the exact exercise page left behind (device storage first, then the server-tracked current lesson). Local and server drafts preserve unsent work; only explicit submission appears to the instructor. Re-submission clears previous feedback/score for a fresh review. Exercises 1–5 collect pasted external AI answers; 4/5 provide downloadable training images. Exercise 6 has an 18-row fictional dataset, five separately stored answers and persistent contextual OpenRouter chat. Exercises 7/8 accept HTTPS links to Gemini work. Once all seven required exercises are submitted, students enter a final summary page: one button runs a single OpenRouter grading pass with per-exercise 0–10 scores, an average, and a reachability check of the music/infographic links (max 5 runs per student; teacher manual scores stay official). Pre/post quizzes remain available in the footer.
 
 ## Run and deploy
 
@@ -20,7 +20,7 @@ npm run build
 npm run preview
 ```
 
-Ignored local `.dev.vars` and `.secrets.json` contain OPENROUTER_API_KEY, ADMIN_PASSWORD and CLASS_CODE. The fixed instructor password/class code requested by the owner are configured as Cloudflare secrets; they are not included in client JS. `credentials.local.txt` is the private handoff file. Never publish these files.
+Ignored local `.dev.vars` and `.secrets.json` contain OPENROUTER_API_KEY and ADMIN_PASSWORD (a legacy CLASS_CODE value may remain but is no longer used by the app). The instructor password is configured as a Cloudflare secret and is not included in client JS. `credentials.local.txt` is the private handoff file. Never publish these files.
 
 ```powershell
 npm run typecheck
@@ -40,7 +40,7 @@ Exercise 6 gets its dataset from server source, not untrusted client context. Ch
 
 ## Instructor
 
-Monitor refreshes every 10 seconds; “online” means activity within 90 seconds. Eight submission columns, seven required completion count, help requests, admission and AI controls, optional sequential locking, CSV export, manual comments and 0–10 scores. Projection hides author metadata by default, but inspect pasted content for names before projecting. Scores are manual per exercise, not automatically weighted course grades.
+Instructor login is the second choice on the landing page (or `/instructor`) with the production password. Monitor refreshes every 10 seconds; “online” means activity within 90 seconds. A group dropdown (all/1–5) filters everything: students in group, finished/not-finished counts, per-exercise submitted/correct/incorrect tallies (correct = AI final-review score ≥ 5), help requests and the roster. Eight submission columns, admission and AI controls, optional sequential locking, CSV export, manual comments and 0–10 scores. Projection hides author metadata by default, but inspect pasted content for names before projecting. Scores are manual per exercise, not automatically weighted course grades.
 
 ## Validation
 

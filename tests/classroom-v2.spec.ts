@@ -9,9 +9,9 @@ import { randomUUID } from "node:crypto";
 test.describe.configure({ mode: "serial" });
 const secret = JSON.parse(readFileSync(".secrets.json", "utf8"));
 const base = "http://127.0.0.1:8787";
-const number = String(700000 + Math.floor(Math.random() * 10000)),
-  uiNumber = String(Number(number) + 10001),
-  uiName = "นักเรียนทดสอบหน้าฝึกใหม่";
+const uiName = "นักเรียนทดสอบหน้าฝึกใหม่ " + Math.floor(Math.random() * 100000);
+let number = "",
+  uiNumber = "";
 let student: APIRequestContext, teacher: APIRequestContext, studentId: string;
 const analysisAnswers = [
   "ตำบลหนองแสง 6 เหตุ มากที่สุด",
@@ -33,35 +33,42 @@ test.afterAll(async () => {
   await teacher?.dispose();
 });
 
-test("self-selected numeric PIN, ownership, individual answers and optional work", async () => {
-  const payload = {
-    number,
-    name: "ผู้เรียน API รุ่นใหม่",
-    squad: "ทดสอบ",
-    code: secret.CLASS_CODE,
-  };
+test("group registration assigns unique four-digit numbers; ownership and validation", async () => {
   expect(
     (
-      await student.post("/api/register", { data: { ...payload, pin: "ABCD" } })
+      await student.post("/api/register", {
+        data: { name: "ผู้เรียนกลุ่มผิด", squad: "9" },
+      })
     ).status(),
   ).toBe(400);
   const registered = await student.post("/api/register", {
-    data: { ...payload, pin: "0456" },
+    data: { name: "ผู้เรียน API รุ่นใหม่", squad: "3" },
   });
   expect(registered.status()).toBe(201);
-  expect((await registered.json()).recovery).toBe("0456");
-  studentId = (await (await student.get("/api/me")).json()).student.id;
+  const body = await registered.json();
+  expect(body.number).toMatch(/^\d{4}$/);
+  number = body.number;
+  const other = await factory.newContext({ baseURL: base });
+  const otherNumber = (
+    await (
+      await other.post("/api/register", {
+        data: { name: "ผู้เรียนอีกคน", squad: "1" },
+      })
+    ).json()
+  ).number;
+  expect(otherNumber).toMatch(/^\d{4}$/);
+  expect(otherNumber).not.toBe(number);
+  await other.dispose();
+  const me = await (await student.get("/api/me")).json();
+  studentId = me.student.id;
+  expect(me.student.squad).toBe("3");
   expect((await student.get("/api/admin/overview")).status()).toBe(403);
-  expect(
-    (
-      await student.post("/api/register", { data: { ...payload, pin: "0456" } })
-    ).status(),
-  ).toBe(409);
   await student.post("/api/logout", { data: {} });
   expect(
-    (
-      await student.post("/api/login", { data: { number, recovery: "0456" } })
-    ).ok(),
+    (await student.post("/api/login", { data: { number: "0000" } })).status(),
+  ).toBe(403);
+  expect(
+    (await student.post("/api/login", { data: { number } })).ok(),
   ).toBeTruthy();
   expect(
     (
@@ -166,11 +173,18 @@ test("mobile: returning login resumes the last exercise page from the server", a
   });
   const page = await ctx.newPage();
   await page.goto("/");
-  await page.getByRole("button", { name: "กลับเข้าเรียน", exact: true }).click();
+  await page.locator(".role-card").first().click();
+  await page.locator(".segmented button").nth(1).click();
   await page.locator('input[name="number"]').fill(number);
-  await page.locator('input[name="recovery"]').fill("0456");
   await page
-    .getByRole("button", { name: "กลับเข้าสู่ห้องเรียน", exact: true })
+    .locator("form")
+    .getByRole("button", { name: "เข้าสู่ระบบ" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "หน้าหลักของฉัน", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "ทำแบบฝึกหัดต่อ", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "ทำภาพสรุปงานสายตรวจ", exact: true }),
@@ -300,14 +314,31 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(page.locator(".brand")).toContainText("By: Dr.Ake");
-  await page.locator('input[name="number"]').fill(uiNumber);
+  await page.locator(".role-card").first().click();
+  await page.locator(".group-picker button").nth(1).click();
   await page.locator('input[name="name"]').fill(uiName);
-  await page.locator('input[name="squad"]').fill("กลุ่มทดสอบ UI");
-  await page.locator('input[name="code"]').fill(secret.CLASS_CODE);
-  await page.locator('input[name="pin"]').fill("0789");
   await page.locator('input[type="checkbox"]').check();
   await page
+    .getByRole("button", { name: "ลงชื่อและรับเลขนักเรียน", exact: true })
+    .click();
+  await page.locator(".assigned-number").waitFor();
+  uiNumber = (await page.locator(".assigned-number").innerText()).replace(
+    /\D/g,
+    "",
+  );
+  expect(uiNumber).toMatch(/^\d{4}$/);
+  await page.screenshot({
+    path: "test-results/v2-student-assigned-number.png",
+    fullPage: true,
+  });
+  await page
     .getByRole("button", { name: "เข้าห้องเรียน", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "หน้าหลักของฉัน", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "เริ่มทำแบบฝึกหัด", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "ลองถาม AI", exact: true }),
@@ -425,10 +456,12 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
     .fill("https://gemini.google.com/share/ui-training-fixture");
   await page.getByRole("button", { name: "ส่งคำตอบ", exact: true }).click();
   await expect(page.locator(".form-success")).toBeVisible();
+  if (await page.locator(".toast").count())
+    await page.locator(".toast").click();
+  await page.locator(".exercise-steps button").first().click();
   await expect(
     page.getByText("ส่งแล้ว 7 / 7 ข้อหลัก", { exact: true }),
   ).toBeVisible();
-  await page.locator(".exercise-steps button").first().click();
   await page
     .getByLabel("คำตอบ", { exact: true })
     .fill("คำตอบฉบับแก้ไข: ตำรวจสายตรวจช่วยเหลือประชาชนและดูแลความปลอดภัย");
@@ -447,13 +480,26 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
   });
   const page2 = await ctx2.newPage();
   await page2.goto("/");
-  await page2
-    .getByRole("button", { name: "กลับเข้าเรียน", exact: true })
-    .click();
+  await page2.locator(".role-card").first().click();
+  await page2.locator(".segmented button").nth(1).click();
   await page2.locator('input[name="number"]').fill(uiNumber);
-  await page2.locator('input[name="recovery"]').fill("0789");
   await page2
-    .getByRole("button", { name: "กลับเข้าสู่ห้องเรียน", exact: true })
+    .locator("form")
+    .getByRole("button", { name: "เข้าสู่ระบบ" })
+    .click();
+  await expect(
+    page2.getByRole("heading", { name: "หน้าหลักของฉัน", exact: true }),
+  ).toBeVisible();
+  await expect(page2.locator(".home-stat").first()).toContainText("7");
+  await expect(
+    page2.getByRole("button", { name: "ทำใหม่อีกครั้ง", exact: true }),
+  ).toBeVisible();
+  await page2.screenshot({
+    path: "test-results/v2-student-home.png",
+    fullPage: true,
+  });
+  await page2
+    .getByRole("button", { name: "ดูคะแนนรวม / ให้ AI ตรวจ", exact: true })
     .click();
   await expect(
     page2.getByRole("heading", { name: "สรุปและส่งคำตอบทั้งหมด", exact: true }),
@@ -482,6 +528,16 @@ test("desktop: eight monitor columns, 7 required, separate subanswers, review an
     page.getByText("ส่งครบ 7 ข้อหลัก", { exact: true }),
   ).toBeVisible();
   expect(await page.locator(".mission-th").count()).toBe(8);
+  expect(await page.locator(".mission-verdict").count()).toBe(8);
+  await page.getByLabel("เลือกกลุ่มเรียน", { exact: true }).selectOption("2");
+  await expect(
+    page.locator(".student-name").filter({ hasText: uiName }),
+  ).toBeVisible();
+  await page.getByLabel("เลือกกลุ่มเรียน", { exact: true }).selectOption("4");
+  await expect(
+    page.locator(".student-name").filter({ hasText: uiName }),
+  ).toHaveCount(0);
+  await page.getByLabel("เลือกกลุ่มเรียน", { exact: true }).selectOption("all");
   await page.getByLabel("ค้นหานักเรียน", { exact: true }).fill(uiNumber);
   await page.locator(".student-name").filter({ hasText: uiName }).click();
   await expect(page.locator(".detail-person")).toContainText("/7 ข้อหลัก");
@@ -510,22 +566,27 @@ test("desktop: eight monitor columns, 7 required, separate subanswers, review an
   await ctx.close();
 });
 
-test("instructor PIN reset remains four digits, student data stays private", async () => {
-  const reset = await teacher.post("/api/admin/recovery", {
-    data: { id: studentId },
-  });
-  const pin = (await reset.json()).recovery;
-  expect(pin).toMatch(/^\d{4}$/);
-  expect((await student.get("/api/me")).status()).toBe(401);
+test("removed PIN endpoints stay closed; logout invalidates the session", async () => {
+  expect(
+    (await student.post("/api/pin", { data: { pin: "1234" } })).status(),
+  ).toBe(404);
   expect(
     (
-      await student.post("/api/login", { data: { number, recovery: pin } })
-    ).ok(),
+      await teacher.post("/api/admin/recovery", { data: { id: studentId } })
+    ).status(),
+  ).toBe(404);
+  await student.post("/api/logout", { data: {} });
+  expect((await student.get("/api/me")).status()).toBe(401);
+  expect(
+    (await student.post("/api/login", { data: { number: "0000" } })).status(),
+  ).toBe(403);
+  expect(
+    (await student.post("/api/login", { data: { number } })).ok(),
   ).toBeTruthy();
   const outsider = await factory.newContext({ baseURL: base });
   expect((await outsider.get("/api/chat")).status()).toBe(401);
-  expect((await outsider.get(`/api/admin/student/${studentId}`)).status()).toBe(
-    401,
-  );
+  expect(
+    (await outsider.get(`/api/admin/student/${studentId}`)).status(),
+  ).toBe(401);
   await outsider.dispose();
 });

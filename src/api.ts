@@ -103,8 +103,8 @@ export type Overview = {
   students: Person[];
   submissions: Submission[];
   quizzes: (QuizResult & { student_id: string })[];
+  finalReviews: { student_id: string; result: string; created_at: number }[];
   usage: { total: number; completed: number; running: number; cost: number };
   serverTime: number;
   model: string;
-  classCode: string;
 };

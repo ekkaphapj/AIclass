@@ -10,7 +10,7 @@ This is the engineering handoff for continuing AI Police Lab without needing the
 - Instructor URL: https://ai-class-p4.ekapap-j.workers.dev/instructor
 - Cloudflare D1 binding: `DB`; name/ID are tracked in `wrangler.jsonc`. `ASSETS` serves the Vite build.
 - Last feature release verified in `docs/validation.json`: course v2, eight exercises, seven required; deployed version recorded there is historical, not a promise that it is still the newest deployment.
-- The operator chose fixed production teacher/class credentials. They remain in Cloudflare secrets and ignored local handoff files. Do not print them or place them in this public repository. Students choose their own PINs.
+- The operator chose a fixed production teacher password (Cloudflare secret + ignored local handoff files). The former class code and student PINs were retired by owner request: students now register with group (1–5) + name and receive a unique system-assigned four-digit number that is the only login credential. Number-only login is weaker than the old number+PIN flow; per-number and per-IP login throttles remain. Do not print credentials or place them in this public repository.
 
 The main audience is approximately 150 police cadets using phones in a two-hour class. The teacher uses a desktop monitor. All data/examples are fictional. The latest owner direction favors short natural Thai copy, simple copy/paste tasks and one exercise per page, rather than a dashboard of many simultaneous student tasks.
 
@@ -27,7 +27,7 @@ The main audience is approximately 150 police cadets using phones in a two-hour 
 | 7 | Optional upbeat male-vocal luk thung/molam call-center-scam warning song in Gemini | HTTPS work link; skipping does not block completion |
 | 8 | Patrol-workflow infographic generated in Gemini using example prompt | HTTPS work link |
 
-`requiredLessons` excludes ID 7. Instructor and student completion use the set of required IDs. Some page bounds, labels, and chat routing still explicitly assume eight exercises and analysis at ID 6. If changing the course structure, search both frontends and `worker/index.ts`; changing the lesson array alone is insufficient.
+`requiredLessons` excludes ID 7. Instructor and student completion use the set of required IDs. The class is organised into five groups; students pick group 1–5 at registration (stored in `students.squad` as "1"–"5"), and the instructor monitor filters every metric, tally and the roster by group. Some page bounds, labels, and chat routing still explicitly assume eight exercises and analysis at ID 6. If changing the course structure, search both frontends and `worker/index.ts`; changing the lesson array alone is insufficient.
 
 The data lives in `shared/activities.ts`; teacher reference: 18 incidents; areas หนองแสง 6, บ้านใหม่ 5, ทุ่งทอง 4, คลองใส 3. Time bands are 00:00–05:59, 06:00–11:59, 12:00–17:59, 18:00–23:59; evening has 10 incidents. Evening theft: 5, of which 4 in หนองแสง. Evening robbery in บ้านใหม่: 3. The patrol plan is open-ended and must account for the limits of this small sample.
 
@@ -50,8 +50,8 @@ The app is one Worker with static assets, not Pages, not a separate Node server.
 
 ### Frontend state and saves
 
-- `App` in `src/main.tsx` loads `/api/config` and `/api/me`, then selects login, student or instructor UI by session role. Students and teachers share the browser cookie name, so use separate browser contexts/profiles for end-to-end tests.
-- `src/Student.tsx` keeps active page under `p4-page-<student-id>` and current-course drafts under `p4-v2-<student-id>-<lesson-id>` in localStorage. On login the page restores from localStorage first, then the server-tracked `current_lesson`, so a student returning on another device still lands on the page they left (clamped to the teacher's active lesson when sequential locking is on). Students with all seven required submissions open on the final summary view instead. On entry, `initialFields` chooses newer server/local drafts over an older submission.
+- `App` in `src/main.tsx` loads `/api/config` and `/api/me`, then selects login, student or instructor UI by session role. The landing page offers a role chooser (student/instructor); `/instructor` opens the teacher login directly. Students and teachers share the browser cookie name, so use separate browser contexts/profiles for end-to-end tests.
+- `src/Student.tsx` opens on the student home view (progress, average score, per-exercise answers, start/continue/redo). The last view is kept in `sessionStorage` under `p4-view-<student-id>` so a mid-session reload returns to the exact view; logout clears it so the next login lands on home. Active page lives under `p4-page-<student-id>` and current-course drafts under `p4-v2-<student-id>-<lesson-id>` in localStorage. On login the page restores from localStorage first, then the server-tracked `current_lesson`, so a student returning on another device still continues on the page they left (clamped to the teacher's active lesson when sequential locking is on). On entry, `initialFields` chooses newer server/local drafts over an older submission.
 - Changes save locally immediately, debounce server saves by 700 ms and serialize them through a promise chain. Navigation flushes drafts; final submission waits for earlier saves and clears the local draft. Preserve these ordering properties when refactoring.
 - Explicit submission is required. A saved draft is not teacher-visible submitted work. Sending chat messages is not submitting answers.
 - Student presence/profile updates run roughly every 30 seconds; config updates roughly every 20. Teacher monitor polls every 10. “Online” is activity within 90 seconds, not formal attendance verification.
@@ -64,15 +64,15 @@ All handlers are in `worker/index.ts`. JSON errors have `{error}` plus HTTP stat
 | Access | Routes | Purpose |
 | --- | --- | --- |
 | Public | `GET /api/health`, `GET /api/config` | Health/public class configuration; no credentials |
-| Public with throttles | `POST /api/register`, `/api/login`, `/api/admin/login` | Registration, PIN return login, instructor login |
+| Public with throttles | `POST /api/register`, `/api/login`, `/api/admin/login` | Group+name registration returning an assigned four-digit number, number-only student login, instructor login |
 | Session | `GET /api/me`, `POST /api/logout` | Current role/profile/state and logout |
-| Student | `POST /api/pin`, `/api/heartbeat`, `/api/help` | Self-selected four-digit PIN, presence and help |
+| Student | `POST /api/heartbeat`, `/api/help` | Presence and help |
 | Student | `POST /api/draft`, `/api/submission`, `/api/quiz` | Drafts, explicit final work and pre/post quizzes |
 | Student | `GET /api/chat`, `POST /api/ai` | Private analysis history and AI calls |
 | Student | `POST /api/final-review` | End-of-class AI grading of every submitted exercise with link reachability checks; requires all seven required lessons |
 | Owner/teacher | `GET /api/image/:submissionId` | Private legacy uploaded image |
 | Teacher | `GET /api/admin/overview`, `/api/admin/student/:id`, `/api/admin/export` | Monitor, detailed submissions, CSV |
-| Teacher | `POST /api/admin/settings`, `/api/admin/review`, `/api/admin/clear-help`, `/api/admin/recovery` | Class controls, review, help resolution, numeric PIN reset |
+| Teacher | `POST /api/admin/settings`, `/api/admin/review`, `/api/admin/clear-help` | Class controls, review, help resolution |
 
 The image upload API is legacy support; current tasks 4/5 use provided public training images and text answers. Work links must be HTTPS; drafts allow incomplete link text until final submission. Backend checks all five analysis answers before accepting exercise 6. It builds the readable `result` from them, not from a client-supplied combined result.
 
@@ -83,7 +83,7 @@ Apply migrations in order; do not edit previously applied files.
 | Table | Important behavior |
 | --- | --- |
 | `settings` | Single row `id=1`; title, expected count, active lesson, sequential lock, admission/AI pause, cumulative budget and request cap |
-| `students` | Unique normalized roster number; name/group; hashed PIN in legacy-named `recovery_hash`; presence and help |
+| `students` | Unique system-assigned four-digit `number`; `name`; class group `"1"`–`"5"` in `squad`; `recovery_hash` is a legacy NOT-NULL random filler (PIN logins were retired); presence and help |
 | `sessions` | Hashed opaque token; student or admin role; 12-hour expiry |
 | `submissions` | Unique `(student_id,lesson)`; prompt/result/reflection/tool/link, media/status/score/feedback; `answers_json` added in migration 0002 |
 | `drafts` | Per student/lesson JSON text and update time |
@@ -98,7 +98,7 @@ Final work is upserted. Re-submission resets status to `submitted`, clears score
 
 ## OpenRouter behavior
 
-Secrets: `OPENROUTER_API_KEY`, `ADMIN_PASSWORD`, `CLASS_CODE`. Runtime model/price estimates: `AI_MODEL`, `AI_INPUT_PRICE`, `AI_OUTPUT_PRICE` in Wrangler config. The existing model is `z-ai/glm-5.3-flash`; verify live availability/pricing before replacing it.
+Secrets: `OPENROUTER_API_KEY`, `ADMIN_PASSWORD` (a legacy `CLASS_CODE` secret may still exist in Cloudflare but nothing reads it). Runtime model/price estimates: `AI_MODEL`, `AI_INPUT_PRICE`, `AI_OUTPUT_PRICE` in Wrangler config. The existing model is `z-ai/glm-5.3-flash`; verify live availability/pricing before replacing it.
 
 - Admission is an atomic `INSERT ... SELECT` conditioned on per-person/global concurrency, quotas and reserved cost. Do not split the checks into a read-then-write race.
 - Per student: 18 successful/running chat calls (jobs with `lesson<>0`); one active chat call. Global concurrency: 12 across everything. Defaults: US$3 cumulative and 1,800 successful/running calls.
@@ -155,7 +155,7 @@ For rollback, inspect the actual current deployment history with Wrangler and it
 - No weighted course grade or certificate generation. The end-of-class AI review gives advisory per-exercise scores; instructor reviews and 0–10 scores remain manual and official.
 - No durable work queue, live WebSocket presence, model fallback, offline service worker, or resumable file-upload flow.
 - The instructor file is still large; changing shared UI/layout requires checking both screens. Some teacher reference prose and numeric course labels are intentionally explicit and can drift if the dataset changes.
-- Four-digit PINs are an owner choice. Keep session authorization and throttling; do not silently change the requested login flow or expose PINs in monitor/export.
+- Number-only student login (no PIN, no class code) is an owner choice made for classroom speed. Keep session authorization and the per-number/per-network login throttles; do not silently reintroduce or remove credentials without an owner request.
 - Law answers, generated infographics and object descriptions are training outputs, not validated legal/procedural decisions. Do not bake an AI's unverified response into an official answer key.
 
 Before handing off another change, summarize what changed, tests actually run, deployment status, and any remaining limitation. Keep credentials and real learner records out of Git and final public artifacts.

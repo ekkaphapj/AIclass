@@ -10,8 +10,9 @@ Read this file, `README.md`, and `docs/AGENT_HANDOFF.md` before changing the app
 - Exercise 7 (music) is optional. Completion means all **seven required** exercises, not eight submissions.
 - Exercises 1–5 use external AI and pasted text. Exercises 4/5 provide downloadable training images. Exercise 6 has five answer fields and an OpenRouter chat using the server's 18-row dataset. Exercises 7/8 accept HTTPS work links.
 - Once all seven required exercises are submitted, the student enters the final summary page. Its submit button runs one OpenRouter grading call giving per-exercise 0–10 scores, an average, and a reachability check of the exercise 7/8 work links. Results persist per student (max 5 runs each); instructor manual scores remain the official review.
-- Students choose a four-digit numeric PIN; preserve leading zeroes. Login uses roster number + PIN. Production instructor/class credentials are secrets, never client constants.
-- Instructor dashboard, eight task columns, per-student review, projection with names initially hidden, QR entry, and CSV export must remain usable on a computer.
+- Students register from the landing role chooser by picking one of five class groups (1–5) and their name; the server assigns a unique four-digit student number shown once, which is the only student login credential. No class code and no teacher gate is required to start. Number-only login is an owner decision; keep the login throttles.
+- After login students land on their home view: completed count, average score, per-exercise scores and answers, plus start/continue/redo buttons. A mid-session reload returns to the exact exercise page left behind; a fresh login lands on home.
+- Instructor dashboard keeps eight task columns, per-student review, projection with names initially hidden, QR entry and CSV export on a computer, plus a group dropdown (all/1–5) that filters the metrics, per-exercise submitted/correct/incorrect counts (correct = AI final-review score ≥ 5) and the roster. Instructor login uses the production password secret.
 
 ## Where to change things
 

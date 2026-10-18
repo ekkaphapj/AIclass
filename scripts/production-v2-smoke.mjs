@@ -37,16 +37,30 @@ try {
   const page = await learner.newPage();
   page.on("pageerror", (e) => report.errors.push(e.message));
   await page.goto(base);
-  const number = String(990000 + Math.floor(Math.random() * 9000)),
-    name = "ทดสอบระบบ8ข้อก่อนส่งมอบ";
-  await page.locator('input[name="number"]').fill(number);
+  const name = "ทดสอบระบบ8ข้อก่อนส่งมอบ";
+  await page.locator(".role-card").first().click();
+  await page.locator(".group-picker button").nth(1).click();
   await page.locator('input[name="name"]').fill(name);
-  await page.locator('input[name="squad"]').fill("SMOKE TEST");
-  await page.locator('input[name="code"]').fill(secrets.CLASS_CODE);
-  await page.locator('input[name="pin"]').fill("0123");
   await page.locator('input[type="checkbox"]').check();
   await page
+    .getByRole("button", { name: "ลงชื่อและรับเลขนักเรียน", exact: true })
+    .click();
+  await page.locator(".assigned-number").waitFor();
+  const number = (await page.locator(".assigned-number").innerText()).replace(
+    /\D/g,
+    "",
+  );
+  await page.screenshot({
+    path: "test-results/production-v2-assigned-number.png",
+  });
+  await page
     .getByRole("button", { name: "เข้าห้องเรียน", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "หน้าหลักของฉัน", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "เริ่มทำแบบฝึกหัด", exact: true })
     .click();
   await page.getByRole("heading", { name: "ลองถาม AI", exact: true }).waitFor();
   const me = await (await learner.request.get(base + "/api/me")).json();
@@ -55,7 +69,7 @@ try {
     "test-results/production-fixture.json",
     JSON.stringify(fixture),
   );
-  report.checks.push("four-digit-class-code-and-self-pin");
+  report.checks.push("group-registration-assigned-four-digit-number");
   assert(
     (await page.locator(".student-brand").innerText()).includes("By: Dr.Ake"),
   );
@@ -144,7 +158,7 @@ try {
 } finally {
   await browser.close();
   if (fixture) {
-    const sql = `DELETE FROM students WHERE id='${fixture.id}' AND number='${fixture.number}' AND name='${fixture.name}' AND squad='SMOKE TEST';`;
+    const sql = `DELETE FROM students WHERE id='${fixture.id}' AND number='${fixture.number}' AND name='${fixture.name}' AND squad='2';`;
     const cleanup = spawnSync(
       process.execPath,
       [
