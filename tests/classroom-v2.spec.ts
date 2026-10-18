@@ -33,31 +33,43 @@ test.afterAll(async () => {
   await teacher?.dispose();
 });
 
-test("group registration assigns unique four-digit numbers; ownership and validation", async () => {
+test("self-entered unique student numbers; ownership and validation", async () => {
+  number = String(100000 + Math.floor(Math.random() * 899999));
   expect(
     (
       await student.post("/api/register", {
-        data: { name: "ผู้เรียนกลุ่มผิด", squad: "9" },
+        data: { name: "ผู้เรียนไม่มีเลข", squad: "3" },
+      })
+    ).status(),
+  ).toBe(400);
+  expect(
+    (
+      await student.post("/api/register", {
+        data: { name: "ผู้เรียนกลุ่มผิด", squad: "9", number },
       })
     ).status(),
   ).toBe(400);
   const registered = await student.post("/api/register", {
-    data: { name: "ผู้เรียน API รุ่นใหม่", squad: "3" },
+    data: { name: "ผู้เรียน API รุ่นใหม่", squad: "3", number },
   });
   expect(registered.status()).toBe(201);
-  const body = await registered.json();
-  expect(body.number).toMatch(/^\d{4}$/);
-  number = body.number;
-  const other = await factory.newContext({ baseURL: base });
-  const otherNumber = (
-    await (
-      await other.post("/api/register", {
-        data: { name: "ผู้เรียนอีกคน", squad: "1" },
+  expect((await registered.json()).number).toBe(number);
+  expect(
+    (
+      await student.post("/api/register", {
+        data: { name: "ผู้เรียนซ้ำเลข", squad: "1", number },
       })
-    ).json()
-  ).number;
-  expect(otherNumber).toMatch(/^\d{4}$/);
-  expect(otherNumber).not.toBe(number);
+    ).status(),
+  ).toBe(409);
+  const other = await factory.newContext({ baseURL: base });
+  const otherRegistered = await other.post("/api/register", {
+    data: {
+      name: "ผู้เรียนอีกคน",
+      squad: "1",
+      number: String(100000 + Math.floor(Math.random() * 899999)),
+    },
+  });
+  expect(otherRegistered.status()).toBe(201);
   await other.dispose();
   const me = await (await student.get("/api/me")).json();
   studentId = me.student.id;
@@ -65,7 +77,16 @@ test("group registration assigns unique four-digit numbers; ownership and valida
   expect((await student.get("/api/admin/overview")).status()).toBe(403);
   await student.post("/api/logout", { data: {} });
   expect(
-    (await student.post("/api/login", { data: { number: "0000" } })).status(),
+    (
+      await student.post("/api/login", { data: { number: "ไม่ใช่ตัวเลข" } })
+    ).status(),
+  ).toBe(400);
+  expect(
+    (
+      await student.post("/api/login", {
+        data: { number: String(Number(number) + 1) },
+      })
+    ).status(),
   ).toBe(403);
   expect(
     (await student.post("/api/login", { data: { number } })).ok(),
@@ -315,18 +336,16 @@ test("mobile: eight pages, external answers, downloads, drafts, chat, optional s
   await page.goto("/");
   await expect(page.locator(".brand")).toContainText("By: Dr.Ake");
   await page.locator(".role-card").first().click();
+  uiNumber = String(150000 + Math.floor(Math.random() * 800000));
+  await page.locator('input[name="number"]').fill(uiNumber);
   await page.locator(".group-picker button").nth(1).click();
   await page.locator('input[name="name"]').fill(uiName);
   await page.locator('input[type="checkbox"]').check();
   await page
-    .getByRole("button", { name: "ลงชื่อและรับเลขนักเรียน", exact: true })
+    .getByRole("button", { name: "ลงทะเบียนเข้าห้องเรียน", exact: true })
     .click();
   await page.locator(".assigned-number").waitFor();
-  uiNumber = (await page.locator(".assigned-number").innerText()).replace(
-    /\D/g,
-    "",
-  );
-  expect(uiNumber).toMatch(/^\d{4}$/);
+  await expect(page.locator(".assigned-number")).toHaveText(uiNumber);
   await page.screenshot({
     path: "test-results/v2-student-assigned-number.png",
     fullPage: true,

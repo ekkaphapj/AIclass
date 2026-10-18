@@ -10,7 +10,7 @@ This is the engineering handoff for continuing AI Police Lab without needing the
 - Instructor URL: https://ai-class-p4.ekapap-j.workers.dev/instructor
 - Cloudflare D1 binding: `DB`; name/ID are tracked in `wrangler.jsonc`. `ASSETS` serves the Vite build.
 - Last feature release verified in `docs/validation.json`: course v2, eight exercises, seven required; deployed version recorded there is historical, not a promise that it is still the newest deployment.
-- The operator chose a fixed production teacher password (Cloudflare secret + ignored local handoff files). The former class code and student PINs were retired by owner request: students now register with group (1–5) + name and receive a unique system-assigned four-digit number that is the only login credential. Number-only login is weaker than the old number+PIN flow; per-number and per-IP login throttles remain. Do not print credentials or place them in this public repository.
+- The operator chose a fixed production teacher password (Cloudflare secret + ignored local handoff files). The former class code and student PINs were retired by owner request: students now register with their own numeric student ID (1–6 digits, duplicate-checked), group (1–5) and name; that ID is the only login credential. Number-only login is weaker than the old number+PIN flow; per-number and per-IP login throttles remain. Do not print credentials or place them in this public repository.
 
 The main audience is approximately 150 police cadets using phones in a two-hour class. The teacher uses a desktop monitor. All data/examples are fictional. The latest owner direction favors short natural Thai copy, simple copy/paste tasks and one exercise per page, rather than a dashboard of many simultaneous student tasks.
 
@@ -64,7 +64,7 @@ All handlers are in `worker/index.ts`. JSON errors have `{error}` plus HTTP stat
 | Access | Routes | Purpose |
 | --- | --- | --- |
 | Public | `GET /api/health`, `GET /api/config` | Health/public class configuration; no credentials |
-| Public with throttles | `POST /api/register`, `/api/login`, `/api/admin/login` | Group+name registration returning an assigned four-digit number, number-only student login, instructor login |
+| Public with throttles | `POST /api/register`, `/api/login`, `/api/admin/login` | Group+name registration with a student-entered unique numeric ID (409 on duplicates), ID-only student login, instructor login |
 | Session | `GET /api/me`, `POST /api/logout` | Current role/profile/state and logout |
 | Student | `POST /api/heartbeat`, `/api/help` | Presence and help |
 | Student | `POST /api/draft`, `/api/submission`, `/api/quiz` | Drafts, explicit final work and pre/post quizzes |
@@ -83,7 +83,7 @@ Apply migrations in order; do not edit previously applied files.
 | Table | Important behavior |
 | --- | --- |
 | `settings` | Single row `id=1`; title, expected count, active lesson, sequential lock, admission/AI pause, cumulative budget and request cap |
-| `students` | Unique system-assigned four-digit `number`; `name`; class group `"1"`–`"5"` in `squad`; `recovery_hash` is a legacy NOT-NULL random filler (PIN logins were retired); presence and help |
+| `students` | Unique student-entered numeric `number` (1–6 digits, leading zeroes normalized away); `name`; class group `"1"`–`"5"` in `squad`; `recovery_hash` is a legacy NOT-NULL random filler (PIN logins were retired); presence and help |
 | `sessions` | Hashed opaque token; student or admin role; 12-hour expiry |
 | `submissions` | Unique `(student_id,lesson)`; prompt/result/reflection/tool/link, media/status/score/feedback; `answers_json` added in migration 0002 |
 | `drafts` | Per student/lesson JSON text and update time |

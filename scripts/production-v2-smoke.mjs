@@ -37,19 +37,17 @@ try {
   const page = await learner.newPage();
   page.on("pageerror", (e) => report.errors.push(e.message));
   await page.goto(base);
-  const name = "ทดสอบระบบ8ข้อก่อนส่งมอบ";
+  const name = "ทดสอบระบบ8ข้อก่อนส่งมอบ",
+    number = String(150000 + Math.floor(Math.random() * 800000));
   await page.locator(".role-card").first().click();
+  await page.locator('input[name="number"]').fill(number);
   await page.locator(".group-picker button").nth(1).click();
   await page.locator('input[name="name"]').fill(name);
   await page.locator('input[type="checkbox"]').check();
   await page
-    .getByRole("button", { name: "ลงชื่อและรับเลขนักเรียน", exact: true })
+    .getByRole("button", { name: "ลงทะเบียนเข้าห้องเรียน", exact: true })
     .click();
   await page.locator(".assigned-number").waitFor();
-  const number = (await page.locator(".assigned-number").innerText()).replace(
-    /\D/g,
-    "",
-  );
   await page.screenshot({
     path: "test-results/production-v2-assigned-number.png",
   });
@@ -69,7 +67,7 @@ try {
     "test-results/production-fixture.json",
     JSON.stringify(fixture),
   );
-  report.checks.push("group-registration-assigned-four-digit-number");
+  report.checks.push("student-entered-unique-student-number");
   assert(
     (await page.locator(".student-brand").innerText()).includes("By: Dr.Ake"),
   );

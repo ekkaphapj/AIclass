@@ -250,53 +250,72 @@ async function api(req: Request, env: Cloudflare.Env) {
     const b = await body(req);
     const c = await settings(env);
     if (!c.admission_open) throw new HttpError(403, "ผู้สอนปิดรับลงชื่อแล้ว");
-    const name = str(b.name, 100),
+    const number = str(b.number, 12),
+      name = str(b.name, 100),
       squad = str(b.squad, 30);
-    if (name.length < 2 || !/^[1-5]$/.test(squad))
-      throw new HttpError(400, "กรุณากรอกชื่อ-นามสกุล และเลือกกลุ่มเรียน 1–5");
+    if (
+      !/^\d{1,6}$/.test(number) ||
+      name.length < 2 ||
+      !/^[1-5]$/.test(squad)
+    )
+      throw new HttpError(
+        400,
+        "กรุณากรอกเลขประจำตัวนักเรียน ชื่อ-นามสกุล และเลือกกลุ่มเรียน 1–5",
+      );
+    const normalized = String(Number(number));
+    if (
+      await env.DB.prepare("SELECT id FROM students WHERE number=?")
+        .bind(normalized)
+        .first()
+    )
+      throw new HttpError(
+        409,
+        "เลขประจำตัวนักเรียนนี้ลงทะเบียนแล้ว ใช้เข้าสู่ระบบได้เลย หรือแจ้งผู้สอนหากไม่ใช่ผู้ลงทะเบียน",
+      );
     const count = await env.DB.prepare(
       "SELECT COUNT(*) n FROM students",
     ).first<{ n: number }>();
     if ((count?.n || 0) >= 300) throw new HttpError(403, "ห้องเรียนเต็มแล้ว");
-    const t = now(),
-      filler = await hash(crypto.randomUUID());
-    let id = "",
-      number = "";
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const candidate = String(1000 + Math.floor(Math.random() * 9000));
-      try {
-        id = crypto.randomUUID();
-        await env.DB.prepare(
-          "INSERT INTO students(id,number,name,squad,recovery_hash,created_at,last_seen) VALUES(?,?,?,?,?,?,?)",
+    const id = crypto.randomUUID(),
+      t = now();
+    try {
+      await env.DB.prepare(
+        "INSERT INTO students(id,number,name,squad,recovery_hash,created_at,last_seen) VALUES(?,?,?,?,?,?,?)",
+      )
+        .bind(
+          id,
+          normalized,
+          name,
+          squad,
+          await hash(crypto.randomUUID()),
+          t,
+          t,
         )
-          .bind(id, candidate, name, squad, filler, t, t)
-          .run();
-        number = candidate;
-        break;
-      } catch {
-        // เลขนี้ถูกใช้แล้ว สุ่มใหม่
-      }
+        .run();
+    } catch {
+      throw new HttpError(
+        409,
+        "เลขประจำตัวนักเรียนนี้ลงทะเบียนแล้ว กรุณาใช้เข้าสู่ระบบ",
+      );
     }
-    if (!number)
-      throw new HttpError(503, "สร้างเลขนักเรียนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-    return json({ ok: true, number }, 201, {
+    return json({ ok: true, number: normalized }, 201, {
       "Set-Cookie": await makeSession(req, env, id, "student"),
     });
   }
   if (path === "/api/login" && method === "POST") {
     const b = await body(req);
     await rateLimit(req, env, "login-shared-network", 600);
-    const number = str(b.number, 12);
-    await rateLimit(req, env, "login-" + number, 15);
-    if (!/^\d{4}$/.test(number))
-      throw new HttpError(400, "เลขนักเรียนเป็นตัวเลข 4 หลัก");
+    const raw = str(b.number, 12);
+    await rateLimit(req, env, "login-" + raw, 15);
+    if (!/^\d{1,6}$/.test(raw))
+      throw new HttpError(400, "เลขประจำตัวนักเรียนเป็นตัวเลข 1–6 หลัก");
     const row = await env.DB.prepare("SELECT id FROM students WHERE number=?")
-      .bind(number)
+      .bind(String(Number(raw)))
       .first<{ id: string }>();
     if (!row)
       throw new HttpError(
         403,
-        "ไม่พบเลขนักเรียนนี้ กรุณาตรวจอีกครั้ง หรือลงชื่อใหม่",
+        "ไม่พบเลขประจำตัวนักเรียนนี้ กรุณาตรวจอีกครั้ง หรือลงทะเบียนใหม่",
       );
     return json({ ok: true }, 200, {
       "Set-Cookie": await makeSession(req, env, row.id, "student"),

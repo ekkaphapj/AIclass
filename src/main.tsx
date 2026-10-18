@@ -268,6 +268,7 @@ function Login({
           return;
         }
         const r = await api<{ number: string }>("/register", {
+          number: form.get("number"),
           name: form.get("name"),
           squad: group,
         });
@@ -366,7 +367,7 @@ function Login({
                   </span>
                   <b>นักเรียน</b>
                   <small>
-                    ลงชื่อรับเลขนักเรียน 4 หลัก หรือเข้าสู่ระบบด้วยเลขที่มีอยู่
+                    ลงทะเบียนด้วยเลขประจำตัวนักเรียนของคุณ หรือเข้าสู่ระบบด้วยเลขเดิม
                   </small>
                   <ArrowRight size={18} />
                 </button>
@@ -402,13 +403,13 @@ function Login({
                 {role === "teacher"
                   ? "ห้องควบคุมสำหรับผู้สอน"
                   : mode === "return"
-                    ? "เข้าสู่ระบบด้วยเลขนักเรียน"
-                    : "ลงชื่อรับเลขนักเรียน"}
+                    ? "เข้าสู่ระบบด้วยเลขประจำตัวนักเรียน"
+                    : "ลงทะเบียนนักเรียน"}
               </h2>
               <p className="muted">
                 {role === "teacher"
                   ? "ติดตามชั้นเรียน ดูผลงาน และนำเสนอบนจอ"
-                  : "ไม่ต้องมีรหัสห้องเรียน เลือกกลุ่มและกรอกชื่อก็เริ่มได้เลย"}
+                  : "ไม่ต้องมีรหัสห้องเรียน กรอกเลขประจำตัว เลือกกลุ่ม และกรอกชื่อก็เริ่มได้เลย"}
               </p>
               {role === "student" && (
                 <div className="segmented">
@@ -447,6 +448,19 @@ function Login({
                 ) : mode === "register" ? (
                   <>
                     <label>
+                      เลขประจำตัวนักเรียน
+                      <input
+                        name="number"
+                        required
+                        inputMode="numeric"
+                        pattern="[0-9]{1,6}"
+                        maxLength={6}
+                        autoComplete="off"
+                        placeholder="เช่น 240125"
+                      />
+                      <small>ห้ามซ้ำกับเพื่อน — ระบบตรวจให้ทันที</small>
+                    </label>
+                    <label>
                       เลือกกลุ่มเรียน
                       <div className="group-picker" role="group" aria-label="กลุ่มเรียน 1-5">
                         {[1, 2, 3, 4, 5].map((n) => (
@@ -481,18 +495,17 @@ function Login({
                   </>
                 ) : (
                   <label>
-                    เลขนักเรียน 4 หลัก
+                    เลขประจำตัวนักเรียน
                     <input
                       name="number"
                       required
                       inputMode="numeric"
-                      pattern="[0-9]{4}"
-                      minLength={4}
-                      maxLength={4}
+                      pattern="[0-9]{1,6}"
+                      maxLength={6}
                       autoComplete="off"
-                      placeholder="เลขที่ได้รับตอนลงชื่อ"
+                      placeholder="เลขที่ใช้ลงทะเบียนไว้"
                     />
-                    <small>ใช้เลขนักเรียนนี้เข้าสู่ระบบทุกครั้ง</small>
+                    <small>ใช้เลขประจำตัวนักเรียนนี้เข้าสู่ระบบทุกครั้ง</small>
                   </label>
                 )}
                 {error && <Notice type="error">{error}</Notice>}
@@ -516,7 +529,7 @@ function Login({
                     : mode === "return"
                       ? "เข้าสู่ระบบ"
                       : config?.admission_open
-                        ? "ลงชื่อและรับเลขนักเรียน"
+                        ? "ลงทะเบียนเข้าห้องเรียน"
                         : "ปิดรับลงชื่อแล้ว"}
                   <ArrowRight size={18} />
                 </Button>
@@ -550,11 +563,11 @@ function Login({
         >
           <div className="assigned-card">
             <CheckCircle2 size={32} />
-            <h2>ลงชื่อสำเร็จ</h2>
-            <p>เลขนักเรียนของคุณคือ</p>
+            <h2>ลงทะเบียนสำเร็จ</h2>
+            <p>ยืนยันเลขประจำตัวนักเรียนของคุณ</p>
             <strong className="assigned-number">{assigned}</strong>
             <small>
-              จดหรือ capture หน้าจอนี้เก็บไว้ ใช้เลข 4 หลักนี้เข้าสู่ระบบทุกครั้ง
+              จดหรือ capture หน้าจอนี้เก็บไว้ ใช้เลขนี้เข้าสู่ระบบทุกครั้ง
             </small>
             <Button type="button" onClick={() => void onLogin()}>
               เข้าห้องเรียน <ArrowRight size={18} />
