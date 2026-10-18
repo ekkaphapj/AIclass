@@ -1953,3 +1953,178 @@ body {
 .extension-panel p {
   margin: 12px 0;
 }
+
+/* Guided extension missions: single-column cards and three short steps. */
+.extension-workspace {
+  padding: clamp(14px, 3vw, 24px);
+}
+.extension-choices {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+.extension-choice {
+  display: grid;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  padding: 20px;
+  border: 1px solid #d6cab5;
+  border-radius: 16px;
+  background: #fffdf7;
+  color: #463923;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.extension-choice strong {
+  font-size: 1.15rem;
+}
+.extension-choice b {
+  color: #72592f;
+}
+.extension-kicker {
+  font-size: 0.8rem;
+  color: #796746;
+  font-weight: 700;
+}
+.extension-back {
+  border: 0;
+  background: transparent;
+  color: #72592f;
+  padding: 12px 0;
+  min-height: 44px;
+  cursor: pointer;
+}
+.extension-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  position: static;
+  top: 0;
+  z-index: 4;
+  background: #faf5e9;
+  padding: 10px 0;
+  margin: 10px 0 18px;
+}
+.extension-tabs button {
+  min-height: 48px;
+  border: 1px solid #d6cab5;
+  border-radius: 10px;
+  background: white;
+  color: #72592f;
+  font-weight: 700;
+  cursor: pointer;
+}
+.extension-tabs button[aria-current="step"] {
+  background: #654832;
+  color: #fff;
+  border-color: #654832;
+}
+.extension-stage {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.extension-stage label {
+  font-weight: 700;
+  margin: 0;
+}
+.extension-stage textarea,
+.extension-stage input {
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.7;
+  font-weight: 400;
+}
+.extension-brief {
+  padding: 18px;
+  background: #f4eee0;
+  border-radius: 14px;
+}
+.extension-stage h4 {
+  margin: 0 0 8px;
+}
+.extension-stage p {
+  line-height: 1.8;
+  margin: 8px 0;
+}
+.extension-help,
+.extension-evidence {
+  border: 1px solid #e0d5c2;
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 0;
+}
+.extension-help summary,
+.extension-evidence summary {
+  cursor: pointer;
+  min-height: 32px;
+  line-height: 1.7;
+  font-weight: 700;
+}
+.extension-evidence summary small {
+  font-weight: 400;
+  color: #796746;
+}
+.extension-evidence-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.extension-record {
+  border-left: 3px solid #b99a54;
+  padding: 12px;
+  background: #faf8f2;
+  border-radius: 6px;
+  min-width: 0;
+}
+.extension-record h4 {
+  font-size: 1rem;
+}
+.extension-record p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  margin: 0;
+  line-height: 1.8;
+}
+.extension-task-list {
+  padding-left: 25px;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  line-height: 1.8;
+}
+.extension-stepbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #fffdf7;
+  border-top: 1px solid #e0d5c2;
+  padding-top: 14px;
+}
+.extension-stepbar .btn {
+  flex: 1;
+  min-height: 48px;
+  white-space: normal;
+  min-width: 100px;
+}
+.extension-stage .extension-actions .btn {
+  min-height: 48px;
+  white-space: normal;
+}
+.extension-notice {
+  padding: 12px;
+  border-radius: 10px;
+  background: #f4eee0;
+  line-height: 1.7;
+}
+@media (min-width: 800px) {
+  .extension-choices {
+    grid-template-columns: 1fr 1fr;
+  }
+  .extension-workspace {
+    max-width: 900px;
+    margin-inline: auto;
+  }
+}

@@ -1,4 +1,4 @@
-import { extensionContent } from "./extension-content";
+import { extensionContent, extensionCases } from "./extension-content";
 import {
   lessons,
   quizQuestions,
@@ -259,6 +259,7 @@ async function api(req: Request, env: Cloudflare.Env) {
     return json({
       unlocked,
       content: unlocked ? extensionContent : [],
+      cases: unlocked ? extensionCases : [],
       work: work.results,
     });
   }
@@ -289,7 +290,7 @@ async function api(req: Request, env: Cloudflare.Env) {
     )
       throw new HttpError(
         400,
-        "เขียน prompt ของตนเองอย่างน้อย 20 ตัวอักษร พร้อมข้อค้นพบ แผน/ข้อจำกัด และลิงก์ภาพ HTTPS ให้ครบ",
+        "เขียน prompt ของตนเองอย่างน้อย 20 ตัวอักษร พร้อมสรุปผล แผนหรือรายงาน และลิงก์ผลงาน HTTPS ให้ครบ",
       );
     const t = now();
     await env.DB.prepare(

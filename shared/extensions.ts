@@ -10,7 +10,21 @@ export type ExtensionWork = {
   updated_at: number;
   submitted_at: number | null;
 };
+export type ExtensionCase = {
+  title: string;
+  intro: string;
+  goal: string;
+  glossary: string[];
+  tasks: string[];
+  sections: { title: string; cards: { heading: string; text: string }[] }[];
+  note: string;
+  starter: string;
+  findingsLabel: string;
+  findingsHint: string;
+  planLabel: string;
+  planHint: string;
+};
 export const extensionTitles = [
-  "สืบคดีจำลอง: ชิงทรัพย์และทำร้ายเจ้าของร้าน",
-  "นาฬิกาอาชญากรรมและแผนชุมชน",
+  "ปล้นรถขนเงิน: CDR และ IMEI",
+  "20 เหตุ 4 โซน: นาฬิกาและแผนที่อาชญากรรม",
 ];

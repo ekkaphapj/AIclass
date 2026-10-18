@@ -59,20 +59,21 @@ Images and provenance: [training assets](docs/training-assets.md). Screenshots/r
 
 Opaque hashed sessions, HttpOnly/SameSite cookies (Secure on HTTPS), role/ownership checks, parameterized SQL, bounded input, per-IP and per-student login throttles, HTTPS link validation, private legacy attachments, cross-origin write rejection, safe text rendering and CSV formula escaping. No third-party font requests or analytics. This remains a single class without automatic retention/deletion. Use fictional/public training material only. Real legal/procedural content requires checking against official sources and the unit's approved procedures.
 
-## Extension missions (October 2026)
+## Extension missions (2026-10-19)
 
-After all seven required original exercises are submitted, students can open two separate 10–15 minute missions from home or the final-summary page: a fictional investigation with witness/CDR/vehicle records, and a 68-incident community patrol planning exercise. Server-side gating protects the content and submissions. Original course completion and grades are unchanged.
+After the seven required original exercises are submitted, students unlock two independent 10–15 minute extension missions. Original completion and grading remain unchanged.
 
-Extension answers and HTTPS presentation links live in `extension_work` (migration 0004). Drafts save locally while typing; the explicit save button persists across devices. Saving a draft after submission changes its status back to started. Students can export a PNG timeline/clock template, then share the image through their chosen service and submit its HTTPS link. The scene asset is an illustrative plan, not a photograph. External AI calls are made in the learner's chosen AI service.
+- Cash-truck robbery: three statements, nine CDR/IMEI records, connection diagram, timeline, fictional scene illustration and a short investigative briefing. Inferences must not be presented as proof of guilt, innocence, location or arrest grounds.
+- Crime Clock & Crime Map: twenty incident reports in four zones, a time-band count and text chart/map, patrol priorities and short community warnings, plus one infographic or poster.
 
-Instructor overview shows group-filtered started/submitted totals and per-student A/B states (locked, ready, started, submitted). Click either status to inspect drafts, answers and presentation links. Extension grading remains separate from original scores. Design and instructor reference: [Thai extension guide](docs/ภารกิจต่อยอด-สองสถานการณ์.md).
+Each mission has Read / Use AI / Submit steps, expandable evidence cards, an editable optional starter prompt, and data+prompt copying. Text data downloads exclude prompts and instructor reference notes. Content, cards and examples are gated server-side. Students submit three fields (analysis, report/plan, HTTPS work link); their prompt is included. Answers save locally while typing; an explicit save persists drafts across devices. Saving a draft after submission changes status back to started. External AI is used in the learner's chosen service; direct image upload is not supported. A PNG template is available if image generation takes too long.
 
-Focused local checks without paid provider requests:
+Instructor overview shows group-filtered started/submitted totals and individual A/B states. Click a status to inspect drafts, prompts, answers and presentation links. Existing work remains intact and may refer to earlier questions; this revision has no schema changes. Tables were added by migration 0004, and the prompt column by 0005. [Thai teaching guide and instructor reference](docs/ภารกิจต่อยอด-สองสถานการณ์.md).
+
+Focused local checks (no paid provider calls):
 
 ```powershell
 npx playwright test tests/extensions.spec.ts tests/classroom-v2.spec.ts --grep "extension gating|self-entered|returning login"
 ```
 
-The legacy budget test requires a nonempty local API key value to reach admission checks; an explicitly fake local test placeholder suffices for this filtered command. Do not run live AI tests with a placeholder or upload local test secrets.
-
-Extension revision: mission A is now a fictional violent robbery with an injured shopkeeper (no graphic images), synchronized system timestamps and a shorter evidence set. Both missions require a learner-authored prompt (minimum 20 characters on final submission, migration 0005). Copy/download contains case data only; collapsible examples provide incomplete scaffolds. Instructor review displays the submitted prompt; older submissions remain readable. The clock template labels time bands without giving calculated totals.
+The legacy budget test needs a nonempty local API key to reach admission checks; an explicitly fake local test placeholder suffices for this filtered command. Do not run live AI tests with a placeholder or upload local test secrets. Restart local preview after rebuilding if the Windows asset watcher serves stale build names.

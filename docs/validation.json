@@ -139,5 +139,35 @@
       "sceneAsset": 200
     },
     "backwardCompatibility": "Old extension submissions remain readable with empty prompt; new submissions require prompt."
+  },
+  "guidedExtensionRevision": {
+    "date": "2026-10-19",
+    "version": "4cee93ef-c130-426c-8ec3-219937adc636",
+    "typecheck": "passed",
+    "build": "passed with existing lucide-react directive warnings",
+    "migration": "none; existing data preserved",
+    "focusedPlaywright": {
+      "passed": 3,
+      "seconds": 8.9,
+      "command": "npx playwright test tests/extensions.spec.ts tests/classroom-v2.spec.ts --grep \"extension gating|self-entered|returning login\"",
+      "coverage": [
+        "original registration, ownership, lesson locks, budget and returning login",
+        "server gate protects both card data and raw data",
+        "9 CDR/IMEI records and 20 distinct incident reports",
+        "incident aggregation equals A4 B4 C7 D5 and time totals 4 morning,4 afternoon,6 evening,6 night",
+        "mobile three-step flow, sample editing and data+prompt copy",
+        "prompt and answer persistence through save/reload",
+        "both missions submitted through UI",
+        "360px and 390px widths, no horizontal overflow",
+        "PNG template export and instructor prompt/link review"
+      ],
+      "limits": "Focused tests only, no paid external AI calls or actual Gemini image generation; physical devices not tested."
+    },
+    "productionReadOnly": {
+      "health": 200,
+      "instructorPage": 200,
+      "newJavascriptAsset": 200,
+      "anonymousExtensions": 401
+    }
   }
 }

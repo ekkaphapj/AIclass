@@ -30,6 +30,7 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     const locked = await (await api.get("/api/extensions")).json();
     expect(locked.unlocked).toBe(false);
     expect(locked.content).toEqual([]);
+    expect(locked.cases).toEqual([]);
     expect(
       (await api.post("/api/extensions", { data: { mission: 1 } })).status(),
     ).toBe(403);
@@ -52,8 +53,29 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     expect(unlocked.unlocked).toBe(true);
     expect(unlocked.content).toHaveLength(2);
     expect(unlocked.content.join("")).not.toContain("เฉลยสำหรับผู้สอน");
-    expect(unlocked.content[0]).toContain("แขนหัก");
-    expect(unlocked.content[0]).toContain("ชิงทรัพย์");
+    expect(unlocked.content[0]).toContain("ปล้นรถขนเงิน");
+    expect(unlocked.content[0]).toContain("IMEI-AAA");
+    expect(unlocked.cases[0].sections[2].cards).toHaveLength(9);
+    expect(unlocked.cases[1].sections[1].cards).toHaveLength(20);
+    const counts: Record<string, number[]> = {
+      A: [0, 0, 0, 0],
+      B: [0, 0, 0, 0],
+      C: [0, 0, 0, 0],
+      D: [0, 0, 0, 0],
+    };
+    for (const card of unlocked.cases[1].sections[1].cards) {
+      const match = card.heading.match(/• (\d{2}):\d{2} น\. • โซน ([ABCD])/);
+      expect(match).toBeTruthy();
+      counts[match![2]][Math.floor(Number(match![1]) / 6)]++;
+    }
+    // Columns here are midnight, morning, afternoon, evening.
+    expect(counts).toEqual({
+      A: [0, 4, 0, 0],
+      B: [0, 0, 4, 0],
+      C: [4, 0, 0, 3],
+      D: [2, 0, 0, 3],
+    });
+
     expect(unlocked.content.join("")).not.toContain("ตัวอย่างเฉพาะส่วน");
     expect(unlocked.content.join("")).not.toContain("ช่วยเรียงเหตุการณ์");
     for (const mission of [1, 2]) {
@@ -102,46 +124,102 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
       ).status(),
     ).toBe(400);
     const page = await context.newPage();
-    await page.goto("/");
-    await page.getByRole("button", { name: /A · สืบคดีจำลอง/ }).click();
-    await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
-      "",
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async (text: string) => {
+            sessionStorage.setItem("test-copied", text);
+          },
+        },
+      }),
     );
-    await page
-      .getByLabel("Prompt ที่คุณเขียนและใช้จริง")
-      .fill(
-        "ช่วยเรียงเหตุการณ์ W1 C1 L1 L2 เป็นตารางเวลาและรหัสหลักฐาน แยกข้อเท็จจริงจากข้อสันนิษฐาน ไม่ตัดสินว่าใครผิด",
-      );
+    await page.goto("/");
+    await page.getByRole("button", { name: /ข้อ 1.*ปล้นรถขนเงิน/ }).click();
+    await expect(
+      page.getByRole("button", { name: "1. อ่านคดี" }),
+    ).toHaveAttribute("aria-current", "step");
+    await expect(
+      page.getByText("เกิดอะไรขึ้น?", { exact: true }),
+    ).toBeVisible();
+    await page.getByText("CDR 9 รายการ", { exact: false }).click();
+    await expect(
+      page.getByRole("heading", { name: "R4 • 14:16 น." }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: "test-results/extensions-mobile-data.png",
+      fullPage: true,
+    });
     const datasetDownload = page.waitForEvent("download");
     await page.getByRole("button", { name: "ดาวน์โหลดข้อมูล .txt" }).click();
     const datasetPath = await (await datasetDownload).path();
     expect(readFileSync(datasetPath!, "utf8")).toBe(unlocked.content[0]);
+    await page.getByRole("button", { name: "ต่อไป: ใช้ AI →" }).click();
+    await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
+      "",
+    );
     await page
-      .getByLabel("ข้อค้นพบ และลำดับเวลา พร้อมรหัสหลักฐาน")
-      .fill("19:50 L1 และ 20:05 L2 เวลาระบบตรงกันแล้ว");
+      .getByRole("button", { name: "ใช้ตัวอย่าง prompt", exact: true })
+      .click();
+    await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
+      /IMEI/,
+    );
     await page
-      .getByLabel("สมมติฐานทางเลือก ข้อจำกัด และข้อมูลที่ต้องตรวจต่อ")
-      .fill("อาจเป็นการส่งของตามปกติ ยังระบุตัวผู้กระทำไม่ได้");
+      .getByLabel("Prompt ที่คุณเขียนและใช้จริง")
+      .fill(
+        "ช่วยดู R3 R4 และ R9 ว่าใครควรตรวจต่อ อธิบายความสัมพันธ์ของเบอร์กับ IMEI ทำผังลูกศรและแยกสิ่งที่ยังไม่รู้ ไม่ตัดสินว่าใครผิด",
+      );
     await page
-      .getByLabel("ลิงก์ภาพนำเสนอ HTTPS")
+      .getByRole("button", { name: "คัดลอกข้อมูล + prompt", exact: true })
+      .click();
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("test-copied")),
+    ).toContain(unlocked.content[0]);
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("test-copied")),
+    ).toContain("ไม่ตัดสินว่าใครผิด");
+    await page.screenshot({
+      path: "test-results/extensions-mobile-prompt.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "ต่อไป: ส่งงาน →" }).click();
+    await page
+      .getByLabel("สรุปที่ได้จาก AI + ผัง / timeline")
+      .fill(
+        "R4 เวลา 14:16 เบอร์ 095-999 ใช้ IMEI-AAA และ R9 ติดต่อเบอร์นายตรี",
+      );
+    await page
+      .getByLabel("รายงานสั้น 5–6 บรรทัด")
+      .fill(
+        "ควรตรวจผู้ใช้เครื่องและความสัมพันธ์การติดต่อ ยังระบุตัวคนถือเครื่องไม่ได้ ต้องตรวจภาพต้นฉบับเพิ่ม",
+      );
+    await page
+      .getByLabel("ลิงก์ภาพหรือผลงาน Gemini (HTTPS)")
       .fill("https://example.com/timeline");
     await page.getByRole("button", { name: "บันทึกร่าง", exact: true }).click();
     await expect(page.getByRole("status")).toContainText(
       "บันทึกร่างบนเซิร์ฟเวอร์แล้ว",
     );
     await page.reload();
-    await page.getByRole("button", { name: /A · สืบคดีจำลอง/ }).click();
-    await expect(
-      page.getByLabel("ข้อค้นพบ และลำดับเวลา พร้อมรหัสหลักฐาน"),
-    ).toHaveValue(/19:50/);
+    await page.getByRole("button", { name: /ข้อ 1.*ปล้นรถขนเงิน/ }).click();
+    await page.getByRole("button", { name: "2. ใช้ AI", exact: true }).click();
     await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
       /ไม่ตัดสินว่าใครผิด/,
     );
-    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "3. ส่งงาน", exact: true }).click();
+    await expect(
+      page.getByLabel("สรุปที่ได้จาก AI + ผัง / timeline"),
+    ).toHaveValue(/14:16/);
+    await page.getByText("สร้างภาพไม่ทัน?", { exact: true }).click();
+    const pictureDownload = page.waitForEvent("download");
     await page
       .getByRole("button", { name: "ดาวน์โหลดภาพแม่แบบจากคำตอบ" })
       .click();
-    expect((await download).suggestedFilename()).toContain(".png");
+    expect((await pictureDownload).suggestedFilename()).toContain(".png");
     await page
       .getByRole("button", { name: "ส่งภารกิจต่อยอด 1", exact: true })
       .click();
@@ -155,18 +233,48 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
       path: "test-results/extensions-mobile.png",
       fullPage: true,
     });
-    const secondSubmit = await api.post("/api/extensions", {
-      data: {
-        mission: 2,
-        prompt:
-          "ช่วยหายอดตามประเภท พื้นที่ และเวลาในตาราง แล้วเสนอแผนโดยมีรถพร้อมรับเหตุหนึ่งชุดเสมอ ตอบสั้นพร้อมตัวเลข",
-        status: "submitted",
-        findings: "รวม 68 เหตุ เย็น 25",
-        plan: "รถหนึ่งชุดพร้อมรับเหตุ อีกชุดตรวจพื้นที่",
-        link: "https://example.com/clock",
-      },
+    await page.getByRole("button", { name: "← เลือกข้ออื่น" }).click();
+    await page.getByRole("button", { name: /ข้อ 2.*20 เหตุ 4 โซน/ }).click();
+    await page.locator("summary").filter({ hasText: "รายงาน 20 เหตุ" }).click();
+    await expect(
+      page.getByRole("heading", { name: "E20 • 01:20 น. • โซน C" }),
+    ).toBeVisible();
+    await page.setViewportSize({ width: 360, height: 800 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: "test-results/extensions-mobile-case2.png",
+      fullPage: true,
     });
-    expect(secondSubmit.ok()).toBe(true);
+    await page.getByRole("button", { name: "2. ใช้ AI", exact: true }).click();
+    await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
+      "",
+    );
+    await page
+      .getByRole("button", { name: "ใช้ตัวอย่าง prompt", exact: true })
+      .click();
+    await expect(page.getByLabel("Prompt ที่คุณเขียนและใช้จริง")).toHaveValue(
+      /ครบ 20/,
+    );
+    await page.getByRole("button", { name: "3. ส่งงาน", exact: true }).click();
+    await page
+      .getByLabel("ตาราง / กราฟ / ผังที่ได้จาก AI")
+      .fill("A เช้า 4 B บ่าย 4 C ค่ำ 3 ดึก 4 D ค่ำ 3 ดึก 2 รวม 20 เหตุ");
+    await page
+      .getByLabel("แผนตรวจ + ข้อความเตือนชุมชน")
+      .fill(
+        "เช้าตลาด บ่ายหมู่บ้าน ค่ำและดึกหอพักกับเลี่ยงเมือง คงรถพร้อมรับเหตุหนึ่งชุด เตือนเก็บทรัพย์และล็อกรถ",
+      );
+    await page
+      .getByLabel("ลิงก์ภาพหรือผลงาน Gemini (HTTPS)")
+      .fill("https://example.com/clock");
+    await page
+      .getByRole("button", { name: "ส่งภารกิจต่อยอด 2", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText("ส่งภารกิจต่อยอดแล้ว");
     const secret = JSON.parse(readFileSync(".secrets.json", "utf8"));
     expect(
       (

@@ -1,11 +1,30 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { api } from "./api";
-import { extensionTitles, type ExtensionWork } from "../shared/extensions";
+import {
+  extensionTitles,
+  type ExtensionWork,
+  type ExtensionCase,
+} from "../shared/extensions";
 
-type Data = { unlocked: boolean; content: string[]; work: ExtensionWork[] };
+type Data = {
+  unlocked: boolean;
+  content: string[];
+  cases: ExtensionCase[];
+  work: ExtensionWork[];
+};
 export function Extensions({ studentId }: { studentId: string }) {
+  const panel = useRef<HTMLElement>(null);
   const [data, setData] = useState<Data>();
   const [active, setActive] = useState(0);
+  const [step, setStep] = useState(1);
+  useEffect(() => {
+    if (active > 0) {
+      const frame = requestAnimationFrame(() =>
+        panel.current?.scrollIntoView({ block: "start" }),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [active, step]);
   const [prompt, setPrompt] = useState("");
   const [findings, setFindings] = useState(""),
     [plan, setPlan] = useState(""),
@@ -45,6 +64,7 @@ export function Extensions({ studentId }: { studentId: string }) {
       setPlan(values.plan);
       setLink(values.link);
       setActive(n);
+      setStep(1);
     } catch (e) {
       setNotice(String(e));
     } finally {
@@ -91,11 +111,20 @@ export function Extensions({ studentId }: { studentId: string }) {
       setBusy(false);
     }
   };
-  const copy = async () => {
+  const copy = async (withPrompt = false) => {
     try {
-      await navigator.clipboard.writeText(data!.content[active - 1]);
+      if (withPrompt && prompt.trim().length < 20) {
+        setNotice("เขียน prompt หรือเลือกใช้ตัวอย่างก่อนคัดลอก");
+        return;
+      }
+      await navigator.clipboard.writeText(
+        data!.content[active - 1] +
+          (withPrompt ? "\n\nคำสั่งของฉัน:\n" + prompt : ""),
+      );
       setNotice(
-        "คัดลอกเฉพาะชุดข้อมูลแล้ว — เขียน prompt ของคุณเพิ่มก่อนส่งให้ AI",
+        withPrompt
+          ? "คัดลอกข้อมูลพร้อม prompt แล้ว — วางใน Gemini ได้เลย"
+          : "คัดลอกชุดข้อมูลแล้ว",
       );
     } catch {
       setNotice("คัดลอกไม่ได้ เลือกข้อความในชุดข้อมูลด้านล่างได้");
@@ -208,178 +237,314 @@ export function Extensions({ studentId }: { studentId: string }) {
       if (blob) download(blob, `mission-${active}-presentation.png`);
     });
   };
+  const current = data?.cases?.[active - 1];
+  const move = (n: number) => {
+    setStep(n);
+    setNotice("");
+  };
   return (
-    <section className="surface extension-panel">
-      <h2>ภารกิจต่อยอด 2 สถานการณ์</h2>
-      <p>แยกจากคะแนนเดิม • ข้อละ 10–15 นาที • นำเสนอ 60–90 วินาที</p>
-      {notice && <p role="status">{notice}</p>}
+    <section
+      ref={panel}
+      className="surface extension-panel extension-workspace"
+    >
+      <h2>ภารกิจต่อยอด</h2>
+      <p className="muted">
+        ทำครบ 7 ข้อหลักก่อน • ข้อละ 10–15 นาที • นำเสนอ 60 วินาที
+      </p>
+      {notice && (
+        <p className="extension-notice" role="status">
+          {notice}
+        </p>
+      )}
       {!data ? (
         <p>กำลังโหลด…</p>
       ) : !data.unlocked ? (
         <p>🔒 ส่งครบ 7 ข้อหลักก่อนเริ่ม (ข้อเพลงไม่บังคับ)</p>
       ) : (
         <>
-          <div className="extension-actions">
-            {extensionTitles.map((title, i) => (
-              <button
-                className="btn secondary"
-                key={title}
-                disabled={busy}
-                onClick={() => void open(i + 1)}
-              >
-                {String.fromCharCode(65 + i)} · {title} —{" "}
-                {data.work.find((w) => w.mission === i + 1)?.status ===
-                "submitted"
-                  ? "ส่งแล้ว"
-                  : data.work.some((w) => w.mission === i + 1)
-                    ? "เริ่มแล้ว"
-                    : "พร้อมเริ่ม"}
-              </button>
-            ))}
-          </div>
-          {active > 0 && (
-            <div className="stack">
-              <h3>{extensionTitles[active - 1]}</h3>
-              <p>
-                อ่าน 2 นาที → เขียน prompt 2 → วิเคราะห์และตรวจ 4 → ทำภาพ 4 นาที
-                ใช้ AI ภายนอกที่เคยใช้ได้เลย
-              </p>
-              <div className="extension-actions">
-                <button className="btn" onClick={() => void copy()}>
-                  คัดลอกเฉพาะชุดข้อมูล
-                </button>
-                <button className="btn secondary" onClick={downloadText}>
-                  ดาวน์โหลดข้อมูล .txt
-                </button>
-                <a
-                  className="btn secondary"
-                  href="https://gemini.google.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  เปิด Gemini
-                </a>
-              </div>
-              {active === 1 && (
-                <img
-                  src="/training/extension-scene.svg"
-                  alt="แผนภาพจำลองร้าน เคาน์เตอร์ ประตูหลัง และลานส่งของ ไม่มีภาพผู้หยิบทรัพย์"
-                  style={{ width: "100%", maxWidth: 650 }}
-                />
-              )}
-              <details>
-                <summary>อ่านชุดข้อมูลคดี</summary>
-                <pre className="extension-data">{data.content[active - 1]}</pre>
-              </details>
-              <section className="surface extension-panel">
-                <h4>ภารกิจของคุณ</h4>
-                <p>
-                  {active === 1
-                    ? "เชื่อมโยงพยาน CDR และทะเบียนรถ: ทำ timeline 4–6 จุด เลือกแนวตรวจสอบแรกพร้อมหลักฐาน 2 รหัส และบอกข้อจำกัดหรือสมมติฐานทางเลือก 1 ข้อ"
-                    : "หาข้อค้นพบประเภท–พื้นที่–เวลา 3 ข้อ ทำนาฬิกาแบบ 4 ช่วงเวลา และเสนอแผนสายตรวจ แผนเผชิญเหตุ และประชาสัมพันธ์อย่างละสั้น ๆ โดยคงรถพร้อมรับเหตุ 1 ชุด"}
-                </p>
-                <p>
-                  เขียน prompt ของตัวเอง 2–4 ประโยค: ให้ AI ทำอะไร •
-                  ใช้ข้อมูลไหน • ตอบรูปแบบใด • ต้องระวังอะไร
-                  แล้วตรวจคำตอบกับข้อมูลจริงในใบงาน ถ้าคำตอบคลาดเคลื่อน
-                  ให้ถามแก้อย่างน้อยหนึ่งจุดที่จำเป็น
-                </p>
-                <details>
-                  <summary>ดูตัวอย่างสั้น ๆ เพื่อประยุกต์</summary>
-                  <p>
-                    {active === 1
-                      ? "ตัวอย่างเฉพาะส่วน: ช่วยเรียงเหตุการณ์จาก [ระบุแหล่งข้อมูล] เป็น [รูปแบบที่เลือก] โดย [ข้อจำกัดที่คุณกำหนด]"
-                      : "ตัวอย่างเฉพาะส่วน: เปรียบเทียบ [ประเภทเหตุ] ใน [พื้นที่/ช่วงเวลา] แล้วเสนอ [งานที่ต้องการ] ภายใต้ [ทรัพยากรที่กำหนด]"}
-                  </p>
-                  <p>
-                    เติมเป้าหมาย แหล่งข้อมูล รูปแบบคำตอบ และข้อจำกัดด้วยตนเอง
-                    ตัวอย่างนี้ยังไม่ครอบคลุมงานทั้งหมด สำหรับภาพ
-                    ให้คิดต่อว่าจะนำเสนออะไร ใช้ตัวเลข/หลักฐานใด
-                    และทำอย่างไรให้อ่านง่ายในมือถือ
-                  </p>
-                </details>
-              </section>
-              <label>
-                Prompt ที่คุณเขียนและใช้จริง
-                <textarea
-                  rows={4}
-                  maxLength={6000}
-                  disabled={busy}
-                  value={prompt}
-                  placeholder="เขียนด้วยคำของคุณเอง ไม่ต้องใช้ศัพท์เทคนิค (อย่างน้อย 20 ตัวอักษร)"
-                  onChange={(e) => update("prompt", e.target.value)}
-                />
-              </label>
-              <label>
-                ข้อค้นพบ{" "}
-                {active === 1
-                  ? "และลำดับเวลา พร้อมรหัสหลักฐาน"
-                  : "3 ประเด็นพร้อมตัวเลข"}
-                <textarea
-                  disabled={busy}
-                  rows={6}
-                  maxLength={8000}
-                  value={findings}
-                  onChange={(e) => update("findings", e.target.value)}
-                />
-              </label>
-              <label>
-                {active === 1
-                  ? "สมมติฐานทางเลือก ข้อจำกัด และข้อมูลที่ต้องตรวจต่อ"
-                  : "แผนสายตรวจ แผนเผชิญเหตุ และประชาสัมพันธ์"}
-                <textarea
-                  disabled={busy}
-                  rows={6}
-                  maxLength={8000}
-                  value={plan}
-                  onChange={(e) => update("plan", e.target.value)}
-                />
-              </label>
-              <button className="btn secondary" onClick={picture}>
-                ดาวน์โหลดภาพแม่แบบจากคำตอบ
-              </button>
-              <p>
-                ภาพแม่แบบใช้ข้อความสั้นส่วนต้น ตรวจว่าแสดงครบก่อนนำเสนอ ภารกิจ A
-                ให้เรียงเวลาในช่องข้อค้นพบ แชร์ภาพผ่านบริการที่ใช้ แล้ววางลิงก์
-                HTTPS
-              </p>
-              <label>
-                ลิงก์ภาพนำเสนอ HTTPS
-                <input
-                  disabled={busy}
-                  type="url"
-                  value={link}
-                  maxLength={2000}
-                  onChange={(e) => update("link", e.target.value)}
-                />
-              </label>
-              <p>
-                ร่างเก็บในเครื่องอัตโนมัติ กดบันทึกร่างเพื่อเปิดทำต่อข้ามเครื่อง
-                การบันทึกร่างหลังส่งจะเปลี่ยนสถานะกลับเป็นเริ่มแล้ว
-              </p>
-              <div className="extension-actions">
-                <button
-                  className="btn secondary"
-                  disabled={busy}
-                  onClick={() => void save(false)}
-                >
-                  บันทึกร่าง
-                </button>
-                <button
-                  className="btn"
-                  disabled={busy}
-                  onClick={() => void save(true)}
-                >
-                  ส่งภารกิจต่อยอด {active}
-                </button>
-              </div>
+          {!active ? (
+            <div className="extension-choices">
+              {extensionTitles.map((title, i) => {
+                const work = data.work.find((w) => w.mission === i + 1);
+                return (
+                  <button
+                    className="extension-choice"
+                    key={title}
+                    disabled={busy}
+                    onClick={() => void open(i + 1)}
+                  >
+                    <span className="extension-kicker">
+                      ข้อ {i + 1} · 10–15 นาที
+                    </span>
+                    <strong>{title}</strong>
+                    <span>
+                      {i === 0
+                        ? "ดูเบอร์โทรและเลขเครื่อง → ผังเชื่อมโยง → ภาพเหตุการณ์"
+                        : "นับเหตุจาก 4 โซน → เลือกช่วงออกตรวจ → ภาพเตือนภัย"}
+                    </span>
+                    <b>
+                      {work?.status === "submitted"
+                        ? "ส่งแล้ว · เปิดดู / แก้ไข"
+                        : work
+                          ? "เริ่มแล้ว · ทำต่อ"
+                          : "เริ่มทำ →"}
+                    </b>
+                  </button>
+                );
+              })}
             </div>
+          ) : (
+            current && (
+              <>
+                <button
+                  className="extension-back"
+                  disabled={busy}
+                  onClick={() => {
+                    setActive(0);
+                    setNotice("");
+                  }}
+                >
+                  ← เลือกข้ออื่น
+                </button>
+                <h3>
+                  ข้อ {active} · {current.title}
+                </h3>
+                <nav
+                  className="extension-tabs"
+                  aria-label="ขั้นตอนภารกิจต่อยอด"
+                >
+                  {["อ่านคดี", "ใช้ AI", "ส่งงาน"].map((title, i) => (
+                    <button
+                      key={title}
+                      disabled={busy}
+                      aria-current={step === i + 1 ? "step" : undefined}
+                      onClick={() => move(i + 1)}
+                    >
+                      {i + 1}. {title}
+                    </button>
+                  ))}
+                </nav>
+                {step === 1 && (
+                  <div className="extension-stage">
+                    <div className="extension-brief">
+                      <span className="extension-kicker">
+                        อ่านประมาณ 2 นาที
+                      </span>
+                      <h4>เกิดอะไรขึ้น?</h4>
+                      <p>{current.intro}</p>
+                      <p>
+                        <strong>วันนี้ต้องทำ:</strong> {current.goal}
+                      </p>
+                    </div>
+                    <details className="extension-help">
+                      <summary>ศัพท์สั้น ๆ ที่ควรรู้</summary>
+                      {current.glossary.map((g) => (
+                        <p key={g}>{g}</p>
+                      ))}
+                    </details>
+                    {current.sections.map((section, i) => (
+                      <details
+                        className="extension-evidence"
+                        key={`${active}-${i}`}
+                        open={i === 0}
+                      >
+                        <summary>
+                          {section.title}{" "}
+                          <small>{section.cards.length} รายการ</small>
+                        </summary>
+                        <div className="extension-evidence-list">
+                          {section.cards.map((card) => (
+                            <article
+                              className="extension-record"
+                              key={card.heading}
+                            >
+                              <h4>{card.heading}</h4>
+                              <p>{card.text}</p>
+                            </article>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                    <details className="extension-help">
+                      <summary>ข้อควรรู้ก่อนวิเคราะห์</summary>
+                      <p>{current.note}</p>
+                    </details>
+                    <div className="extension-actions">
+                      <button
+                        className="btn secondary"
+                        onClick={() => void copy()}
+                      >
+                        คัดลอกเฉพาะชุดข้อมูล
+                      </button>
+                      <button className="btn secondary" onClick={downloadText}>
+                        ดาวน์โหลดข้อมูล .txt
+                      </button>
+                    </div>
+                    <div className="extension-stepbar">
+                      <button className="btn" onClick={() => move(2)}>
+                        ต่อไป: ใช้ AI →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {step === 2 && (
+                  <div className="extension-stage">
+                    <h4>ให้ AI ช่วย 4 อย่าง</h4>
+                    <ol className="extension-task-list">
+                      {current.tasks.map((task) => (
+                        <li key={task}>{task}</li>
+                      ))}
+                    </ol>
+                    <p>
+                      เขียนคำสั่งเอง หรือกดใช้ตัวอย่างแล้วปรับคำถามให้เป็นของคุณ
+                    </p>
+                    <button
+                      className="btn secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          !prompt.trim() ||
+                          window.confirm("แทนที่ prompt ปัจจุบันด้วยตัวอย่าง?")
+                        )
+                          update("prompt", current.starter);
+                      }}
+                    >
+                      ใช้ตัวอย่าง prompt
+                    </button>
+                    <label>
+                      Prompt ที่คุณเขียนและใช้จริง
+                      <textarea
+                        rows={7}
+                        maxLength={6000}
+                        value={prompt}
+                        disabled={busy}
+                        placeholder="อยากให้ AI ช่วยอะไร? อยากได้คำตอบแบบไหน?"
+                        onChange={(e) => update("prompt", e.target.value)}
+                      />
+                    </label>
+                    <div className="extension-actions">
+                      <button className="btn" onClick={() => void copy(true)}>
+                        คัดลอกข้อมูล + prompt
+                      </button>
+                      <a
+                        className="btn secondary"
+                        href="https://gemini.google.com/"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        เปิด Gemini ↗
+                      </a>
+                    </div>
+                    <div className="extension-brief">
+                      <h4>ทำบนมือถืออย่างไร?</h4>
+                      <p>1. กดคัดลอก → เปิด Gemini → วางแล้วส่ง</p>
+                      <p>2. อ่านคำตอบ เทียบกับข้อมูล หากคลาดเคลื่อนให้ถามแก้</p>
+                      <p>
+                        3. ให้ Gemini ทำภาพ 1 ภาพ
+                        แล้วคัดลอกคำตอบและลิงก์ผลงานกลับมาส่ง
+                      </p>
+                    </div>
+                    <div className="extension-stepbar">
+                      <button className="btn secondary" onClick={() => move(1)}>
+                        ← อ่านคดี
+                      </button>
+                      <button className="btn" onClick={() => move(3)}>
+                        ต่อไป: ส่งงาน →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {step === 3 && (
+                  <div className="extension-stage">
+                    <h4>ส่งเพียง 3 ช่อง</h4>
+                    <p>
+                      Prompt จากขั้นที่ 2 จะถูกส่งไปด้วย เตรียมเล่าหน้าชั้น 60
+                      วินาที
+                    </p>
+                    <label>
+                      {current.findingsLabel}
+                      <textarea
+                        rows={6}
+                        maxLength={8000}
+                        disabled={busy}
+                        value={findings}
+                        placeholder={current.findingsHint}
+                        onChange={(e) => update("findings", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      {current.planLabel}
+                      <textarea
+                        rows={5}
+                        maxLength={8000}
+                        disabled={busy}
+                        value={plan}
+                        placeholder={current.planHint}
+                        onChange={(e) => update("plan", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      ลิงก์ภาพหรือผลงาน Gemini (HTTPS)
+                      <input
+                        type="url"
+                        inputMode="url"
+                        disabled={busy}
+                        value={link}
+                        maxLength={1200}
+                        placeholder="https://gemini.google.com/share/…"
+                        onChange={(e) => update("link", e.target.value)}
+                      />
+                    </label>
+                    <details className="extension-help">
+                      <summary>สร้างภาพไม่ทัน?</summary>
+                      <p>
+                        ดาวน์โหลดแม่แบบจากคำตอบสั้น ๆ แล้วแชร์ผ่านบริการที่ใช้
+                        นำลิงก์ HTTPS มาวาง ภาพใช้ข้อความส่วนต้น
+                        ตรวจภาพก่อนนำเสนอ
+                      </p>
+                      <button className="btn secondary" onClick={picture}>
+                        ดาวน์โหลดภาพแม่แบบจากคำตอบ
+                      </button>
+                    </details>
+                    <p className="muted">
+                      ร่างเก็บในเครื่องระหว่างพิมพ์
+                      กดบันทึกร่างเพื่อทำต่อข้ามเครื่อง
+                      การบันทึกร่างหลังส่งจะเปลี่ยนสถานะกลับเป็นเริ่มแล้ว
+                    </p>
+                    <div className="extension-stepbar">
+                      <button
+                        className="btn secondary"
+                        disabled={busy}
+                        onClick={() => move(2)}
+                      >
+                        ← ใช้ AI
+                      </button>
+                      <button
+                        className="btn secondary"
+                        disabled={busy}
+                        onClick={() => void save(false)}
+                      >
+                        บันทึกร่าง
+                      </button>
+                      <button
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => void save(true)}
+                      >
+                        ส่งภารกิจต่อยอด {active}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )
           )}
         </>
       )}
     </section>
   );
 }
+
 function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
