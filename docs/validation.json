@@ -7,7 +7,7 @@
   "playwright": {
     "tests": 7,
     "passed": 7,
-    "lastRunSeconds": 21.3,
+    "lastRunSeconds": 37.9,
     "browser": "Chromium",
     "mobileViewport": "390x844",
     "desktopViewport": "1440x1000",
@@ -15,6 +15,9 @@
       "self-entered unique student IDs (1-6 digits): missing 400, duplicate 409, wrong 403",
       "group selection 1-5 at registration with on-screen ID confirmation",
       "number-only login, logout invalidation, closed retired PIN endpoints",
+      "auto-advance to the next exercise after each submit (lesson 6 excepted for its chat)",
+      "final-review rubric: base 7 for correct complete answers, server-scored link exercises (opens=10)",
+      "roster completion date/time and score columns with finish-time/score sorting",
       "eight exercise pages, previous/next and editable drafts",
       "returning login resumes the last exercise page from the server on a fresh device",
       "student home view with progress, score and start/continue/redo entry",
@@ -60,8 +63,8 @@
     "fixtureRemoved": true
   },
   "finalReviewSample": {
-    "note": "Local integration fixture graded by the deployed model during the suite run. Placeholder answers scored 0, the matched analysis answers scored 10, and the work link received a reachability label. Advisory only; instructor manual scores remain official.",
-    "average": 3.1
+    "note": "Local integration fixture graded by the deployed model during the suite run under the coarse rubric: placeholder answers scored 0, complete matched analysis answers scored 9 (base 7 + detail), and the opening work link earned the server-awarded full 10. Advisory only; instructor manual scores remain official.",
+    "average": 3.3
   },
   "secretAudit": "OpenRouter API key and instructor password absent from public JS/CSS. Four-digit class-code substrings are excluded from byte-string scanning to avoid matching library digit alphabets.",
   "courseVersion": 2,
@@ -70,5 +73,5 @@
   "optionalExercises": [
     7
   ],
-  "deploymentVersion": "0bb826d2-313f-4f09-a057-4be8fcfefa20"
+  "deploymentVersion": "3dfd08af-4027-41c9-9aff-bfd95b5aa902"
 }
