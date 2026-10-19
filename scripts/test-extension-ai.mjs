@@ -286,3 +286,256 @@ test("extension AI: provider failure retains reservation and does not save a cha
     f.db.close();
   }
 });
+
+const saveExtension = async (f, mission = 1) => {
+  const r = await f.request(
+    {
+      mission,
+      status: "submitted",
+      prompt,
+      findings: "R3 R4 R9 หรือ E01 เป็นหลักฐาน ต้องตรวจคนใช้เครื่อง",
+      plan: "สรุปสิ่งที่พบและตรวจหลักฐานเพิ่มเติมก่อนสรุป",
+      link: "",
+    },
+    "pupil",
+    "/api/extensions",
+  );
+  assert.equal(r.status, 200);
+};
+test("grading: final review receives current Chinese source, translation and unknown-device criteria", async () => {
+  const f = setup(),
+    saved = globalThis.fetch;
+  let payload;
+  globalThis.fetch = async (url, init) => {
+    assert.equal(url, "https://openrouter.ai/api/v1/chat/completions");
+    payload = JSON.parse(init.body);
+    return Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              lessons: [1, 2, 3, 4, 5, 6].map((lesson) => ({
+                lesson,
+                score: 8,
+                comment: "fixture",
+              })),
+              summary: "ตรวจตามเกณฑ์ใหม่",
+            }),
+          },
+        },
+      ],
+      usage: { cost: 0.001 },
+    });
+  };
+  try {
+    const response = await f.request(
+      { id: randomUUID() },
+      "pupil",
+      "/api/final-review",
+    );
+    assert.equal(response.status, 200);
+    const content = payload.messages[1].content;
+    assert.ok(content.includes("警官您好"));
+    assert.ok(content.includes("พรุ่งนี้บ่าย"));
+    assert.ok(content.includes("คำแปลอ้างอิง"));
+    assert.ok(content.includes("unknown-device.png"));
+    assert.ok(content.includes("trail camera"));
+    assert.ok(content.includes("เฉลยตัวเลขอ้างอิงสำหรับตรวจข้อ 6"));
+    assert.equal((await response.json()).rubricVersion, "2026-10-19-v2");
+  } finally {
+    globalThis.fetch = saved;
+    f.db.close();
+  }
+});
+test("grading: private reference, scope-safe replay, saved scores and stale-answer detection", async () => {
+  const f = setup(),
+    saved = globalThis.fetch;
+  let calls = 0,
+    payload;
+  globalThis.fetch = async (url, init) => {
+    calls++;
+    payload = JSON.parse(init.body);
+    return Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              score: 8.5,
+              feedback: "อ้างหลักฐานได้",
+              improvements: "แยกข้อสันนิษฐานให้ชัด",
+            }),
+          },
+        },
+      ],
+      usage: { cost: 0.001 },
+    });
+  };
+  try {
+    assert.equal(
+      (
+        await f.request(
+          { mission: 1, id: randomUUID() },
+          "pupil",
+          "/api/extensions/review",
+        )
+      ).status,
+      400,
+    );
+    await saveExtension(f);
+    const id = randomUUID();
+    let r = await f.request(
+      { mission: 1, id },
+      "pupil",
+      "/api/extensions/review",
+    );
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).score, 8.5);
+    assert.ok(payload.messages[0].content.includes("R4/R6/R8/R9"));
+    assert.ok(payload.messages[0].content.includes("ไม่เปิดดูเนื้อหาลิงก์"));
+    let d = await (await f.request(null, "pupil", "/api/extensions")).json();
+    assert.equal(d.reviews[0].stale, false);
+    assert.equal(JSON.parse(d.reviews[0].result).score, 8.5);
+    assert.ok(!JSON.stringify(d.cases).includes("promptที่กำหนดงานชัด0–2"));
+    r = await f.request({ mission: 1, id }, "pupil", "/api/extensions/review");
+    assert.equal((await r.json()).replayed, true);
+    assert.equal(calls, 1);
+    await saveExtension(f, 2);
+    assert.equal(
+      (await f.request({ mission: 2, id }, "pupil", "/api/extensions/review"))
+        .status,
+      409,
+    );
+    assert.equal((await f.request({ extension: 1, id, prompt })).status, 409);
+    f.db.exec(
+      "UPDATE extension_work SET findings='แก้คำตอบให้เพิ่มข้อมูลใหม่' WHERE mission=1",
+    );
+    d = await (await f.request(null, "pupil", "/api/extensions")).json();
+    assert.equal(d.reviews.find((r) => r.mission === 1).stale, true);
+    assert.equal(
+      (
+        await (
+          await f.request({ mission: 1, id }, "pupil", "/api/extensions/review")
+        ).json()
+      ).stale,
+      true,
+    );
+    assert.equal(
+      (await (await f.request(null, "pupil", "/api/me")).json()).aiUsed,
+      0,
+    );
+    assert.equal(
+      (
+        await f.request(
+          { mission: 1, id: randomUUID() },
+          "other",
+          "/api/extensions/review",
+        )
+      ).status,
+      403,
+    );
+  } finally {
+    globalThis.fetch = saved;
+    f.db.close();
+  }
+});
+test("grading: per-mission five-run cap, separate original review allowance and second case answer key", async () => {
+  const f = setup(),
+    saved = globalThis.fetch;
+  let calls = 0,
+    last;
+  globalThis.fetch = async (url, init) => {
+    calls++;
+    last = JSON.parse(init.body);
+    return Response.json({
+      choices: [
+        {
+          message: {
+            content:
+              '{"score":7,"feedback":"ครบ","improvements":"เพิ่มรายละเอียด"}',
+          },
+        },
+      ],
+      usage: { cost: 0.001 },
+    });
+  };
+  try {
+    await saveExtension(f);
+    await saveExtension(f, 2);
+    for (let i = 0; i < 5; i++)
+      assert.equal(
+        (
+          await f.request(
+            { mission: 1, id: randomUUID() },
+            "pupil",
+            "/api/extensions/review",
+          )
+        ).status,
+        200,
+      );
+    assert.equal(
+      (
+        await f.request(
+          { mission: 1, id: randomUUID() },
+          "pupil",
+          "/api/extensions/review",
+        )
+      ).status,
+      403,
+    );
+    assert.equal(calls, 5);
+    assert.equal(
+      f.db.prepare("SELECT COUNT(*) n FROM ai_jobs WHERE lesson=0").get().n,
+      0,
+    );
+    assert.equal(
+      (
+        await f.request(
+          { mission: 2, id: randomUUID() },
+          "pupil",
+          "/api/extensions/review",
+        )
+      ).status,
+      200,
+    );
+    assert.ok(last.messages[0].content.includes("C=0/0/3/4"));
+    assert.ok(last.messages[0].content.includes("D=0/0/3/2"));
+  } finally {
+    globalThis.fetch = saved;
+    f.db.close();
+  }
+});
+test("grading: malformed provider result retains cost and does not persist a false score", async () => {
+  const f = setup(),
+    saved = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: '{"score":99,"feedback":"bad","improvements":"bad"}',
+          },
+        },
+      ],
+    });
+  try {
+    await saveExtension(f);
+    assert.equal(
+      (
+        await f.request(
+          { mission: 1, id: randomUUID() },
+          "pupil",
+          "/api/extensions/review",
+        )
+      ).status,
+      502,
+    );
+    assert.equal(
+      f.db.prepare("SELECT status FROM extension_reviews").get().status,
+      "failed",
+    );
+    assert.equal(f.db.prepare("SELECT cost FROM ai_jobs").get().cost, 0.004);
+  } finally {
+    globalThis.fetch = saved;
+    f.db.close();
+  }
+});

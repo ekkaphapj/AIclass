@@ -72,6 +72,7 @@ export type FinalReviewLesson = {
   linkStatus?: string;
 };
 export type FinalReviewResult = {
+  rubricVersion?: string;
   lessons: FinalReviewLesson[];
   average: number;
   summary: string;

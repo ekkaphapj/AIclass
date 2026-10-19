@@ -140,6 +140,40 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
       mockHistory[b.extension].push({ id: b.id, prompt: b.prompt, result });
       await route.fulfill({ json: { result } });
     });
+    const mockReviews: Record<number, unknown> = {};
+    await context.route("**/api/extensions", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.continue();
+        return;
+      }
+      const response = await route.fetch();
+      const d = await response.json();
+      d.reviews = Object.values(mockReviews);
+      await route.fulfill({ response, json: d });
+    });
+    await context.route("**/api/extensions/review", async (route) => {
+      const b = route.request().postDataJSON();
+      const result = {
+        score: 8,
+        feedback: "เกณฑ์ใหม่ fixture อ้างหลักฐานได้",
+        improvements: "ระบุข้อมูลตรวจเพิ่ม",
+        rubricVersion: "2026-10-19-v2",
+      };
+      mockReviews[b.mission] = {
+        mission: b.mission,
+        status: "done",
+        result: JSON.stringify(result),
+        created_at: Date.now(),
+        stale: false,
+      };
+      await route.fulfill({ json: result });
+    });
+    await teacher.route("**/api/admin/extensions/*", async (route) => {
+      const response = await route.fetch();
+      const d = await response.json();
+      d.reviews = Object.values(mockReviews);
+      await route.fulfill({ response, json: d });
+    });
     const page = await context.newPage();
     await page.addInitScript(() =>
       Object.defineProperty(navigator, "clipboard", {
@@ -258,6 +292,16 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
       .getByRole("button", { name: "ส่งภารกิจต่อยอด 1", exact: true })
       .click();
     await expect(page.getByRole("status")).toContainText("ส่งภารกิจต่อยอดแล้ว");
+    await page
+      .getByRole("button", {
+        name: "ให้ AI ตรวจข้อเสริมนี้ (0–10)",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByRole("region", { name: "คะแนน AI ข้อเสริม" }),
+    ).toContainText("8/10");
+
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -371,6 +415,9 @@ test("extension gating, persistence, ownership, instructor status and mobile pre
     ).toHaveCount(2);
     await expect(dashboard.getByRole("dialog")).toContainText(
       "ไม่ตัดสินว่าใครผิด",
+    );
+    await expect(dashboard.getByRole("dialog")).toContainText(
+      "เกณฑ์ใหม่ fixture อ้างหลักฐานได้",
     );
     await dashboard.screenshot({
       path: "test-results/extensions-instructor.png",

@@ -213,5 +213,53 @@
       "anonymousExtensionChat": 401
     },
     "imageProvenance": "built-in imagegen; local project asset reviewed; see docs/training-assets.md"
+  },
+  "answerKeyAndExtensionGradingRelease": {
+    "date": "2026-10-19",
+    "version": "f78ca2ec-c0bf-4cb4-ae76-6c0b3f5674b7",
+    "rubricVersion": "2026-10-19-v2",
+    "migration": "0006_extension_reviews.sql applied locally and remotely",
+    "typecheck": "passed",
+    "build": "passed with existing lucide-react warnings",
+    "backendTests": {
+      "passed": 8,
+      "command": "npm run test:extension-ai",
+      "scope": "actual Worker bundle and migration SQL in memory; provider mocked",
+      "gradingCoverage": [
+        "Chinese source and reference translation included in original final review",
+        "current unknown-device description and candidate-ID rubric",
+        "private extension reference keys and score persistence",
+        "source hashes and stale-answer detection",
+        "per-mission five-run limit",
+        "review channels excluded from chat quota",
+        "scope-safe idempotent replay",
+        "malformed provider response retains conservative cost"
+      ]
+    },
+    "focusedBrowser": {
+      "passed": 4,
+      "seconds": 12.5,
+      "command": "npx playwright test tests/extensions.spec.ts tests/revised-lessons.spec.ts tests/classroom-v2.spec.ts --grep \"extension gating|self-entered|returning login|mobile Chinese\"",
+      "scope": "grading and chat provider responses mocked for UI; no full live AI suite",
+      "coverage": [
+        "student extension grade action and result",
+        "instructor extension score and feedback",
+        "existing registration and returning login",
+        "Chinese and object exercise mobile render",
+        "drafts, submission and chat copy flow"
+      ]
+    },
+    "productionReadOnly": {
+      "health": 200,
+      "instructorPage": 200,
+      "newJavascriptHEAD": 200,
+      "anonymousExtensions": 401
+    },
+    "limits": [
+      "Original stored scores preserved, recheck required for latest rubric",
+      "Extension grader evaluates text only, not linked images",
+      "Official legal/travel links are not opened or independently verified by grader",
+      "AI scores advisory; original manual instructor grading unchanged"
+    ]
   }
 }

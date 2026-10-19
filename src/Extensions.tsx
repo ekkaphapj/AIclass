@@ -1,10 +1,12 @@
+import { ExtensionGrade } from "./ExtensionGrade";
 import { ExtensionAi } from "./ExtensionAi";
 import React, { useEffect, useState, useRef } from "react";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import {
   extensionTitles,
   type ExtensionWork,
   type ExtensionCase,
+  type ExtensionReview,
 } from "../shared/extensions";
 
 type Data = {
@@ -12,6 +14,7 @@ type Data = {
   content: string[];
   cases: ExtensionCase[];
   work: ExtensionWork[];
+  reviews: ExtensionReview[];
 };
 export function Extensions({ studentId }: { studentId: string }) {
   const panel = useRef<HTMLElement>(null);
@@ -106,6 +109,31 @@ export function Extensions({ studentId }: { studentId: string }) {
       await refresh();
       localStorage.removeItem(key(active));
       setNotice(submit ? "ส่งภารกิจต่อยอดแล้ว" : "บันทึกร่างบนเซิร์ฟเวอร์แล้ว");
+    } catch (e) {
+      setNotice(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const grade = async () => {
+    setBusy(true);
+    setNotice("กำลังตรวจข้อเสริมกับเฉลย…");
+    const id = crypto.randomUUID();
+    try {
+      for (let i = 0; i < 15; i++) {
+        try {
+          await api("/extensions/review", { mission: active, id });
+          await refresh();
+          setNotice("ตรวจข้อเสริมแล้ว คะแนนแยกจากคะแนนเดิม");
+          return;
+        } catch (e) {
+          if (e instanceof ApiError && e.retry && i < 14) {
+            await new Promise((r) => setTimeout(r, 4000));
+            continue;
+          }
+          throw e;
+        }
+      }
     } catch (e) {
       setNotice(String(e));
     } finally {
@@ -555,6 +583,22 @@ export function Extensions({ studentId }: { studentId: string }) {
                       กดบันทึกร่างเพื่อทำต่อข้ามเครื่อง
                       การบันทึกร่างหลังส่งจะเปลี่ยนสถานะกลับเป็นเริ่มแล้ว
                     </p>
+                    <ExtensionGrade
+                      review={data.reviews?.find((r) => r.mission === active)}
+                      onGrade={() => void grade()}
+                      busy={busy}
+                      disabled={
+                        !data.work.some(
+                          (w) =>
+                            w.mission === active &&
+                            w.status === "submitted" &&
+                            w.prompt === prompt &&
+                            w.findings === findings &&
+                            w.plan === plan &&
+                            w.link === link,
+                        )
+                      }
+                    />
                     <div className="extension-stepbar">
                       <button
                         className="btn secondary"
@@ -606,10 +650,16 @@ export function InstructorExtension({
   onClose: () => void;
 }) {
   const [work, setWork] = useState<ExtensionWork[]>();
+  const [reviews, setReviews] = useState<ExtensionReview[]>([]);
   const [error, setError] = useState("");
   useEffect(() => {
-    api<{ work: ExtensionWork[] }>(`/admin/extensions/${studentId}`)
-      .then((d) => setWork(d.work))
+    api<{ work: ExtensionWork[]; reviews: ExtensionReview[] }>(
+      `/admin/extensions/${studentId}`,
+    )
+      .then((d) => {
+        setWork(d.work);
+        setReviews(d.reviews || []);
+      })
       .catch((e) => setError(String(e)));
   }, [studentId]);
   return (
@@ -633,6 +683,9 @@ export function InstructorExtension({
               timeZone: "Asia/Bangkok",
             })}
           </p>
+          <ExtensionGrade
+            review={reviews.find((r) => r.mission === w.mission)}
+          />
           <h4>Prompt ของผู้เรียน</h4>
           <p style={{ whiteSpace: "pre-wrap" }}>
             {w.prompt || "งานเดิมก่อนเพิ่มช่อง prompt"}

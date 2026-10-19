@@ -1,3 +1,4 @@
+import { GRADING_VERSION } from "../shared/grading-version";
 import { Extensions } from "./Extensions";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -1219,7 +1220,8 @@ function FinalReview({
   } catch {}
   const stale = !!(
     result &&
-    me.submissions.some((s) => s.updated_at > (saved?.created_at || 0))
+    (result.rubricVersion !== GRADING_VERSION ||
+      me.submissions.some((s) => s.updated_at > (saved?.created_at || 0)))
   );
   async function run() {
     setBusy(true);
@@ -1334,7 +1336,7 @@ function FinalReview({
           {checkedAt && <small>ตรวจเมื่อ {checkedAt}</small>}
           {stale && (
             <p className="final-stale">
-              มีการแก้ไขคำตอบหลังตรวจล่าสุด กดตรวจใหม่เพื่ออัปเดตคะแนน
+              คำตอบหรือเกณฑ์ตรวจเปลี่ยนจากครั้งล่าสุด กดตรวจใหม่เพื่ออัปเดตคะแนน
             </p>
           )}
         </section>

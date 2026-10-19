@@ -28,3 +28,11 @@ export const extensionTitles = [
   "ปล้นรถขนเงิน: CDR และ IMEI",
   "20 เหตุ 4 โซน: นาฬิกาและแผนที่อาชญากรรม",
 ];
+
+export type ExtensionReview = {
+  mission: number;
+  status: "running" | "done" | "failed";
+  result: string;
+  stale: boolean;
+  created_at: number;
+};

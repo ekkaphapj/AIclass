@@ -88,7 +88,7 @@ Apply migrations in order; do not edit previously applied files.
 | `submissions` | Unique `(student_id,lesson)`; prompt/result/reflection/tool/link, media/status/score/feedback; `answers_json` added in migration 0002 |
 | `drafts` | Per student/lesson JSON text and update time |
 | `quizzes` | Per student + pre/post kind; first submitted score is retained |
-| `ai_jobs` | Idempotency ID, owner, status, reserved and actual cost, cached result. `lesson=0` rows are end-of-class final reviews; `lesson<>0` counts feed the 18-per-student chat quota |
+| `ai_jobs` | Idempotency ID, owner, status, reserved and actual cost, cached result. `lesson=0` rows are end-of-class final reviews; `lesson>0` counts feed the 18-per-student chat quota |
 | `chat_messages` | Per-student analysis history; added by migration 0002 |
 | `final_reviews` | One row per student with the latest AI final-review status/result; added by migration 0003 |
 | `attachments` | Legacy private image data URLs; authorization required when reading |
@@ -101,7 +101,7 @@ Final work is upserted. Re-submission resets status to `submitted`, clears score
 Secrets: `OPENROUTER_API_KEY`, `ADMIN_PASSWORD` (a legacy `CLASS_CODE` secret may still exist in Cloudflare but nothing reads it). Runtime model/price estimates: `AI_MODEL`, `AI_INPUT_PRICE`, `AI_OUTPUT_PRICE` in Wrangler config. The existing model is `z-ai/glm-5.3-flash`; verify live availability/pricing before replacing it.
 
 - Admission is an atomic `INSERT ... SELECT` conditioned on per-person/global concurrency, quotas and reserved cost. Do not split the checks into a read-then-write race.
-- Per student: 18 successful/running chat calls (jobs with `lesson<>0`); one active chat call. Global concurrency: 12 across everything. Defaults: US$3 cumulative and 1,800 successful/running calls.
+- Per student: 18 successful/running chat calls (jobs with `lesson>0`); one active chat call. Global concurrency: 12 across everything. Defaults: US$3 cumulative and 1,800 successful/running calls.
 - `POST /api/final-review` requires every required lesson submitted, then admits a `lesson=0` job (separate 5-per-student allowance, shared global caps/budget). It fetches each submitted HTTPS work link once (8-second timeout) for a reachability label, sends one grading call with the text-exercise answers plus the lesson 6 reference counts, and stores strict-JSON scores (averaged over the seven required), summary and link labels in `final_reviews` and the job's cached result. The rubric is deliberately coarse per owner request: correct and complete text answers start at 7 with up to 3 more for detail; link exercises (7/8) are scored by the server from the reachability check alone — opens = 10, broken = 0, inconclusive = 7 — and are not sent to the model. Duplicate job IDs replay the stored review. Edited submissions after a review leave the stored review in place; the student UI flags it stale and re-running spends another of the five runs. Instructor manual scores remain the official review.
 - Reserve US$0.004 before calling. Success replaces it with reported usage cost, or configured token-price estimate. Failed/uncertain calls retain a conservative reservation as cost. Running records older than 90 seconds are reclaimed as failed with reserved cost.
 - Maximum output: 2,400 tokens including reasoning; provider timeout: 55 seconds. Model rejects reasoning disabled, so keep `reasoning: {effort:'low',exclude:true}` unless a tested model change requires otherwise.
@@ -168,4 +168,10 @@ Both extension missions offer OpenRouter or external Gemini in step 2. /api/ai a
 
 Internal AI is text-only, with no web search or image generation. Learners may submit a text diagram without a work link; supplied links still require HTTPS. Copying an AI answer never submits it automatically. Mission 1 asks for a person–phone–IMEI evidence diagram with times, R labels and uncertain links rather than a reenactment image; mission 2 remains a simple count/map/patrol planning task. No migration needed.
 
-Run npm run test:extension-ai for four mocked-provider tests executing the actual Worker against in-memory SQLite using applied migration SQL. Browser checks are separate; neither is proof of live provider availability. A full suite still needs a real local API key.
+Run npm run test:extension-ai for eight mocked-provider tests executing the actual Worker against in-memory SQLite using applied migration SQL. Browser checks are separate; neither is proof of live provider availability. A full suite still needs a real local API key.
+
+## Grading revision
+
+worker/grading.ts contains private answer keys; do not expose these through student data APIs or import it into frontend code. /api/final-review now supplies Chinese source/reference translation and the current unknown-device reference to the grader and stamps rubricVersion. Existing 7+3 grading and seven-required averaging remain unchanged. The UI flags missing/older rubric versions; it never silently replaces persisted scores.
+
+POST /api/extensions/review with mission and UUID requires seven original submissions plus a submitted extension work row. Uses atomic ai_jobs reservation, per-mission five-run allowance, global class caps and student concurrency. Channels -1/-2 are excluded from chat allowance (>0), while original final review stays 0. Job replay is scoped by student and channel. Table extension_reviews (migration 0006) stores the latest review and source hash. GET /api/extensions and admin student-extension detail include review rows with computed stale status. Saving changed work makes the prior result stale, and an in-flight result is flagged stale if work changes during provider latency. Do not treat links as inspected image content. Scores are advisory and remain separate from original scores.
