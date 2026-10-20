@@ -373,7 +373,7 @@ async function api(req: Request, env: Cloudflare.Env) {
     });
   }
   if (path === "/api/register" && method === "POST") {
-    await rateLimit(req, env, "register", 200);
+    await rateLimit(req, env, "register", 600);
     const b = await body(req);
     const c = await settings(env);
     if (!c.admission_open) throw new HttpError(403, "ผู้สอนปิดรับลงชื่อแล้ว");
@@ -395,10 +395,6 @@ async function api(req: Request, env: Cloudflare.Env) {
         409,
         "เลขประจำตัวนักเรียนนี้ลงทะเบียนแล้ว ใช้เข้าสู่ระบบได้เลย หรือแจ้งผู้สอนหากไม่ใช่ผู้ลงทะเบียน",
       );
-    const count = await env.DB.prepare(
-      "SELECT COUNT(*) n FROM students",
-    ).first<{ n: number }>();
-    if ((count?.n || 0) >= 300) throw new HttpError(403, "ห้องเรียนเต็มแล้ว");
     const id = crypto.randomUUID(),
       t = now();
     try {
@@ -1291,7 +1287,7 @@ async function api(req: Request, env: Cloudflare.Env) {
     )
       .bind(
         str(b.title, 120) || "AI Police Lab · P4",
-        Math.min(300, Math.max(1, Number(b.expected) || 150)),
+        Math.min(10000, Math.max(1, Math.trunc(Number(b.expected) || 150))),
         Math.min(lessons.length, Math.max(1, Number(b.active_lesson) || 1)),
         b.lock_following ? 1 : 0,
         b.admission_open ? 1 : 0,

@@ -539,3 +539,121 @@ test("grading: malformed provider result retains cost and does not persist a fal
     f.db.close();
   }
 });
+
+test("registration: pupil 301 can join without deleting existing students; duplicate and admission controls remain", async () => {
+  const f = setup(false);
+  try {
+    const insert = f.db.prepare(
+      "INSERT INTO students(id,number,name,squad,recovery_hash,created_at,last_seen) VALUES(?,?,?,?,?,?,?)",
+    );
+    for (let i = 0; i < 298; i++)
+      insert.run(
+        "capacity-" + i,
+        String(1000 + i),
+        "fictional fixture",
+        "1",
+        "unused",
+        Date.now(),
+        Date.now(),
+      );
+    assert.equal(f.db.prepare("SELECT COUNT(*) n FROM students").get().n, 300);
+    let r = await f.request(
+      { number: "999999", name: "ผู้เรียนคนที่ 301", squad: "5" },
+      "pupil",
+      "/api/register",
+    );
+    assert.equal(r.status, 201);
+    assert.equal(f.db.prepare("SELECT COUNT(*) n FROM students").get().n, 301);
+    assert.equal(
+      (
+        await f.request(
+          { number: "999999", name: "เลขซ้ำ", squad: "5" },
+          "pupil",
+          "/api/register",
+        )
+      ).status,
+      409,
+    );
+    f.db.exec("UPDATE settings SET admission_open=0");
+    assert.equal(
+      (
+        await f.request(
+          { number: "999998", name: "ปิดรับใหม่", squad: "1" },
+          "pupil",
+          "/api/register",
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (await f.request({ number: "123" }, "pupil", "/api/login")).status,
+      200,
+    );
+    f.db
+      .prepare("INSERT INTO sessions VALUES(?,NULL,?,?)")
+      .run(
+        createHash("sha256").update("admin-fixture").digest("hex"),
+        "admin",
+        Date.now() + 3600000,
+      );
+    const settings = f.db.prepare("SELECT * FROM settings").get();
+    assert.equal(
+      (
+        await f.request(
+          { ...settings, expected: 1000 },
+          "admin-fixture",
+          "/api/admin/settings",
+        )
+      ).status,
+      200,
+    );
+    assert.equal(
+      f.db.prepare("SELECT expected FROM settings").get().expected,
+      1000,
+    );
+  } finally {
+    f.db.close();
+  }
+});
+test("registration: shared classroom network can exceed 200 attempts while keeping a 600-attempt throttle", async () => {
+  const f = setup(false);
+  try {
+    const key = createHash("sha256").update("register:local").digest("hex");
+    f.db
+      .prepare("INSERT INTO login_attempts VALUES(?,?,?)")
+      .run(key, 200, Date.now());
+    assert.equal(
+      (
+        await f.request(
+          { number: "888881", name: "ผู้เรียนผ่านเครือข่ายร่วม", squad: "1" },
+          "pupil",
+          "/api/register",
+        )
+      ).status,
+      201,
+    );
+    f.db.prepare("UPDATE login_attempts SET attempts=599 WHERE key=?").run(key);
+    assert.equal(
+      (
+        await f.request(
+          { number: "888882", name: "ผู้เรียนลำดับคำขอ 600", squad: "1" },
+          "pupil",
+          "/api/register",
+        )
+      ).status,
+      201,
+    );
+    assert.equal(
+      (
+        await f.request(
+          { number: "888883", name: "จำกัดคำขอเกิน 600", squad: "1" },
+          "pupil",
+          "/api/register",
+        )
+      ).status,
+      429,
+    );
+  } finally {
+    f.db.close();
+  }
+});

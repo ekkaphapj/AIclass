@@ -261,5 +261,42 @@
       "Official legal/travel links are not opened or independently verified by grader",
       "AI scores advisory; original manual instructor grading unchanged"
     ]
+  },
+  "registrationCapacityFix": {
+    "date": "2026-10-20",
+    "version": "12d2de37-8cde-478d-8cf4-7500ed78f1f8",
+    "productionDiagnosis": {
+      "registered": 300,
+      "expected": 150,
+      "admission_open": 1,
+      "inspection": "read-only aggregate SQL before release"
+    },
+    "change": "Remove legacy 300-student registration cap; allow expected dashboard target up to 10000; increase per-network registration throttle from 200 to 600 attempts per 10 minutes",
+    "typecheck": "passed",
+    "build": "passed with existing lucide-react warnings",
+    "tests": {
+      "command": "npm run test:extension-ai",
+      "passed": 10,
+      "scope": "Actual Worker and migration SQL with in-memory SQLite; AI provider mocked for existing AI checks",
+      "newCoverage": [
+        "301st registration succeeds with all 300 existing records preserved",
+        "duplicate ID still rejected",
+        "closed admissions still reject new registrations",
+        "existing login works with admissions closed",
+        "expected=1000 accepted and stored",
+        "registration attempt 201 allowed, 600 allowed, 601 throttled"
+      ]
+    },
+    "productionReadOnly": {
+      "health": 200,
+      "admission_open": 1,
+      "newJavascriptHEAD": 200
+    },
+    "migration": "none",
+    "limits": [
+      "No full browser or paid-provider suite rerun for this focused backend capacity fix",
+      "No production test learner or learner data deletion",
+      "Removing the roster cap is not a load/concurrent-AI capacity guarantee"
+    ]
   }
 }

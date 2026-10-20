@@ -1791,12 +1791,15 @@ function SettingsModal({
           <input
             type="number"
             min={1}
-            max={300}
+            max={10000}
             value={form.expected}
             onChange={(e) =>
               setForm({ ...form, expected: Number(e.target.value) })
             }
           />
+          <small className="muted">
+            ใช้แสดงเป้าหมายในหน้าผู้สอน ไม่ใช่เพดานรับลงทะเบียน
+          </small>
         </label>
         <label className="toggle-label">
           <input
